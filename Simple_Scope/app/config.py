@@ -126,8 +126,7 @@ class AppConfig:
         suffix = Path(filename).suffix
         
         # Look for numeric suffix
-        match = re.search(r'(\d+)
-, stem)
+        match = re.search(r'(\d+)', stem)
         
         if match:
             # Extract base name and number

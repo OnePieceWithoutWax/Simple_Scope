@@ -4,7 +4,7 @@ Oscilloscope Screenshot Capture Application
 Entry point for the application
 """
 
-import sys
+import sys, os
 from pathlib import Path
 from app.gui import ScopeCaptureApp
 
@@ -23,5 +23,6 @@ if __name__ == "__main__":
         application_path = Path(__file__).parent
     
     # Change to application directory
-    Path.cwd().chdir(application_path)
+    # Path.cwd().chdir(application_path)
+    os.chdir(application_path)
     main()

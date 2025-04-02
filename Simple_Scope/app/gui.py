@@ -5,7 +5,7 @@ GUI implementation for the Oscilloscope Screenshot Capture Application
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from app.scope_controller import ScopeController
+from app.scope_controller import TektronixScopeDriver as ScopeController
 from app.config import AppConfig
 
 class ScopeCaptureApp(tk.Tk):
