@@ -2,53 +2,70 @@
 Controller for communicating with the oscilloscope via pyvisa
 """
 import time
+import pathlib
 import pyvisa
 
 class ScopeDriver:
     """Base Controller class for oscilloscope"""
     
     def __init__(self, address=None):
-        self.resource_manager = pyvisa.ResourceManager()
-        self.device = None
-        self._device_address = None
+        self.resource_manager = None
+        self.adaptor = None
+        self._address = None
         
-        self.device_address = address
+        self.address = address  # property to set the address
 
 
     @property
-    def device_address(self):
+    def address(self):
         """Get the device address"""
-        return self._device_address
+        return self._address
 
-    @device_address.setter
-    def device_address(self, address):
+    @address.setter
+    def address(self, address):
         """Set the device address"""
-        if self.device is not None:
-            self.device.close()
-        self._device_address = address
-        self.device = None  # Reset device to None when address changes
+        if self.adaptor is not None:
+            self.adaptor.close()
+        self._address = address
+        self.adaptor = None  # Reset device to None when address changes
         if address is not None:
             self.connect()  # Attempt to connect to the new address
 
 
     def connect(self):
         """Connect to the oscilloscope"""
-        if self.device_address is None:
+        if self.address is None:
             raise ValueError("Device address is not set.")
         
+        self.resource_manager = pyvisa.ResourceManager()
+        
         try:
-            self.device = self.resource_manager.open_resource(self.device_address)
-            self.device.timeout = 5000  # Set timeout to 5 seconds
+            self.adaptor = self.resource_manager.open_resource(self.address)
+            self.adaptor.timeout = 5000  # Set timeout to 5 seconds
             return True
         except Exception as e:
             print(f"Error connecting to device: {e}")
             return False
         
 
+    def disconnect(self):
+        """Disconnect from the oscilloscope"""
+        if self.adaptor is not None:
+            self.adaptor.close()
+            self.adaptor = None
+            # print("Disconnected from oscilloscope.") # replace with logging maybe
+        else:
+            # print("No oscilloscope connected.")
+            pass
+        
+        if self.resource_manager is not None:
+            # self.resource_manager.close() # or equivialent?
+            self.resource_manager = None
+
 
     def is_connected(self):
         """Check if a scope is connected"""
-        return self.device is not None
+        return self.adaptor is not None
     
     
     def capture_screenshot(self, save_dir, filename, bg_color="white", save_waveform=False, metadata=None):

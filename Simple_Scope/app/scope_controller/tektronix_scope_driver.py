@@ -21,38 +21,34 @@ class TektronixScopeDriver(ScopeDriver):
         Returns:
             str: Path to the saved file
         """
-        if not self.device:
+        if not self.adaptor:
             raise ValueError("No oscilloscope connected")
         
         # Create full path and ensure directory exists
-        save_path = Path(save_dir)
+        save_path = pathlib.Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
         file_path = save_path / filename
         
         try:
             # Set up the hardcopy parameters
-            self.device.write(f"HARDCOPY:INKSAVER {0 if bg_color.lower() == 'black' else 1}")
-            self.device.write("HARDCOPY:FORMAT PNG")
-            self.device.write("HARDCOPY:LAYOUT PORTRAIT")
+            self.adaptor.write(f"HARDCOPY:INKSAVER {0 if bg_color.lower() == 'black' else 1}")
+            self.adaptor.write("HARDCOPY:FORMAT PNG")
+            self.adaptor.write("HARDCOPY:LAYOUT PORTRAIT")
             
             # Capture the screenshot
-            self.device.write("HARDCOPY START")
+            self.adaptor.write("HARDCOPY START")
             
             # Wait a moment for the scope to generate the image
             time.sleep(1)
             
             # Get the screenshot data
-            self.device.write("HARDCOPY:PORT USB")
-            self.device.write(f"FILESYSTEM:WRITEFILE \"{str(file_path)}\"")
+            self.adaptor.write("HARDCOPY:PORT USB")
+            self.adaptor.write(f"FILESYSTEM:WRITEFILE \"{str(file_path)}\"")
             
             # Save waveform data if requested
             if save_waveform:
                 waveform_path = file_path.with_suffix('.csv')
                 self._save_waveform_data(waveform_path)
-            
-            # Save metadata if provided
-            if metadata:
-                self._save_metadata(file_path, metadata)
             
             return str(file_path)
             
@@ -69,18 +65,18 @@ class TektronixScopeDriver(ScopeDriver):
         """
         try:
             # Set up data export
-            self.device.write("DATA:SOURCE CH1")
-            self.device.write("DATA:ENCDG ASCII")
-            self.device.write("DATA:START 1")
-            self.device.write("DATA:STOP 10000")  # Adjust as needed
+            self.adaptor.write("DATA:SOURCE CH1")
+            self.adaptor.write("DATA:ENCDG ASCII")
+            self.adaptor.write("DATA:START 1")
+            self.adaptor.write("DATA:STOP 10000")  # Adjust as needed
             
             # Get waveform data
-            data = self.device.query("CURVE?")
+            data = self.adaptor.query("CURVE?")
             
             # Get scaling parameters
-            x_inc = float(self.device.query("WFMOUTPRE:XINCR?"))
-            y_mult = float(self.device.query("WFMOUTPRE:YMULT?"))
-            y_off = float(self.device.query("WFMOUTPRE:YOFF?"))
+            x_inc = float(self.adaptor.query("WFMOUTPRE:XINCR?"))
+            y_mult = float(self.adaptor.query("WFMOUTPRE:YMULT?"))
+            y_off = float(self.adaptor.query("WFMOUTPRE:YOFF?"))
             
             # Format data
             values = data.split(',')
@@ -94,24 +90,4 @@ class TektronixScopeDriver(ScopeDriver):
         except Exception as e:
             print(f"Error saving waveform data: {str(e)}")
     
-    def _save_metadata(self, img_path, metadata):
-        """
-        Save metadata to a companion text file
-        
-        Args:
-            img_path (Path or str): Path to the image file
-            metadata (dict): Metadata to save
-        """
-        # Create metadata file path based on image path
-        img_path = Path(img_path)
-        metadata_path = img_path.with_stem(f"{img_path.stem}_metadata").with_suffix('.txt')
-        
-        with open(metadata_path, 'w') as f:
-            f.write(f"Image file: {img_path.name}\n")
-            f.write(f"Capture time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Device: {self.device_id}\n\n")
-            
-            # Write custom metadata
-            f.write("Custom Metadata:\n")
-            for key, value in metadata.items():
-                f.write(f"{key}: {value}\n")
+

@@ -8,7 +8,7 @@ from tkinter import ttk, filedialog, messagebox
 from app.scope_controller import TektronixScopeDriver as ScopeController
 from app.config import AppConfig
 
-class ScopeCaptureApp(tk.Tk):
+class ScopeCaptureGUI(tk.Tk):
     """Main application window for the oscilloscope capture tool"""
     
     def __init__(self):

@@ -6,11 +6,11 @@ Entry point for the application
 
 import sys, os
 from pathlib import Path
-from app.gui import ScopeCaptureApp
+from app.gui import ScopeCaptureGUI
 
 def main():
     """Main entry point for the application"""
-    app = ScopeCaptureApp()
+    app = ScopeCaptureGUI()
     app.mainloop()
 
 if __name__ == "__main__":
