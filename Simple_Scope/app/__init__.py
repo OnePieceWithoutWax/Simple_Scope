@@ -1,1 +1,1 @@
-"""Oscilloscope Screenshot Capture Application - Scope Drivers"""
+"""Oscilloscope Screenshot Capture Application"""
