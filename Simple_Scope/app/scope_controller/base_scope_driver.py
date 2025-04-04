@@ -71,7 +71,7 @@ class ScopeDriver:
         return self.adaptor is not None
     
     
-    def capture_screenshot(self, save_dir, filename, bg_color="white", save_waveform=False, metadata=None):
+    def capture_screenshot(self, save_dir, filename, suffix='.png',  bg_color="white", save_waveform=False, metadata=None, *args, **kwargs):
         """
         Capture a screenshot from the connected oscilloscope
         

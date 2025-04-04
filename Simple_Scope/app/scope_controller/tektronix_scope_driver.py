@@ -15,7 +15,7 @@ class TektronixScopeDriver(ScopeDriver):
 # intended to capture a screenshot from the connected oscilloscope. It takes several parameters such
 # as the directory to save the screenshot, the filename, background color, whether to save waveform
 # data, and optional metadata.
-    def capture_screenshot_AI(self, save_dir, filename, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
+    def capture_screenshot(self, save_dir, filename, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
         """
         Capture a screenshot from the connected oscilloscope
         

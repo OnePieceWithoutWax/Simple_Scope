@@ -196,7 +196,7 @@ class ScopeCaptureGUI(tk.Tk):
                                             suffix = self.file_format_var.get(), 
                                             bg_color = self.bg_color_var.get(), 
                                             save_waveform = self.save_waveform_var.get(), 
-                                            metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()}, # Get metadata
+                                            metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()} # Get metadata
                                             )
             
             messagebox.showinfo("Success", f"Screenshot saved to: {file_path}")
