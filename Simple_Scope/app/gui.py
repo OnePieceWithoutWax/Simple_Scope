@@ -5,7 +5,6 @@ GUI implementation for the Oscilloscope Screenshot Capture Application
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import re
 from app.simple_scope import SimpleScope
 
 class ScopeCaptureGUI(tk.Tk):
@@ -189,26 +188,23 @@ class ScopeCaptureGUI(tk.Tk):
             messagebox.showwarning("Not Connected", "No oscilloscope connected. Please scan for devices first.")
             return
         
-        save_dir = self.save_dir_var.get()
-        filename = self.filename_var.get()
-        suffix = self.file_format_var.get()
-        bg_color = self.bg_color_var.get()
-        save_waveform = self.save_waveform_var.get()
-        
         try:
-            # Get metadata
-            metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()}
-            
+            filename_ = self.filename_var.get()
             # Capture the screenshot
             file_path = self.scope.capture(
-                save_dir, filename, suffix, bg_color, save_waveform, metadata
+                save_dir = self.save_dir_var.get(), 
+                filename = filename_, # self.filename_var.get(), 
+                suffix = self.file_format_var.get(), 
+                bg_color = self.bg_color_var.get(), 
+                save_waveform = self.save_waveform_var.get(), 
+                metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()}, # Get metadata
             )
             
             messagebox.showinfo("Success", f"Screenshot saved to: {file_path}")
             
             # Update filename for next capture (increment counter)
-            next_filename = self._increment_filename(filename)
-            self.filename_var.set(next_filename)
+            # next_filename = self.scope._increment_filename(filename_)
+            self.filename_var.set(self.scope._increment_filename(filename_))
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")

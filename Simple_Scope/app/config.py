@@ -28,6 +28,7 @@ class AppConfig:
         self.config = {
             "save_directory": str(Path.home() / "projects" / "scope_capture"),
             "default_filename": "capture_001", # No suffix required
+            "filename": None,
             "file_format": "png",
             "background_color": "white",
             "save_waveform": False,
@@ -51,6 +52,7 @@ class AppConfig:
     
     def save_config(self):
         """Save configuration to file"""
+        # pass
         try:
             # Ensure directory exists
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -59,7 +61,8 @@ class AppConfig:
                 json.dump(self.config, f, indent=4)
                 
         except Exception as e:
-            print(f"Error saving configuration: {str(e)}")
+            print(f"Error saving configuration: {str(e)}") #really need to add logging herel
+    
     
     def get_save_directory(self):
         """Get the save directory path"""
@@ -80,15 +83,30 @@ class AppConfig:
         
         self.save_config()
     
-    def get_default_suffix(self):
+    def get_default_file_format(self):
         """Get the default filename"""
         if '.' not in self.config["file_format"]:
             self.config["file_format"] = '.' + self.config["file_format"]
         return self.config["file_format"]
+    
+    def set_default_file_format(self, file_format):
+        """Get the default filename"""
+        self.config["file_format"] = file_format
 
     def get_default_filename(self):
         """Get the default filename"""
         return self.config["default_filename"]
+
+    def get_filename(self):
+        """Get the filename"""
+        if self.config["filename"] is None:
+            return self.get_default_filename()
+        return self.config["filename"]
+
+    def set_filename(self, filename):
+        """Get the filename"""
+        self.config["filename"] = filename
+        self.save_config()
 
     def set_default_filename(self, filename):
         """Set the default filename"""
@@ -111,6 +129,14 @@ class AppConfig:
             self.save_config()
             return True
         return False
+    
+    def get_filename_with_suffix(self, filename=''):
+        """Get the default filename"""
+        if '.' not in self.config["file_format"]:
+            self.config["file_format"] = '.' + self.config["file_format"]
+        if not filename.endswith(self.config["file_format"]):
+            filename += self.config["file_format"]
+        return filename
     
     def get_next_filename(self, base_dir=None):
         """
