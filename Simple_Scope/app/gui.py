@@ -5,8 +5,8 @@ GUI implementation for the Oscilloscope Screenshot Capture Application
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from app.scope_controller import TektronixScopeDriver as ScopeController
-from app.config import AppConfig
+import re
+from app.simple_scope import SimpleScope
 
 class ScopeCaptureGUI(tk.Tk):
     """Main application window for the oscilloscope capture tool"""
@@ -16,8 +16,9 @@ class ScopeCaptureGUI(tk.Tk):
         
         self.title("Scope Capture")
         self.geometry("600x400")
-        self.config = AppConfig()
-        self.scope_controller = ScopeController()
+        
+        # Initialize backend
+        self.scope = SimpleScope()
         
         # Create and configure the notebook (tabbed interface)
         self.notebook = ttk.Notebook(self)
@@ -65,7 +66,7 @@ class ScopeCaptureGUI(tk.Tk):
         # Save Directory
         ttk.Label(frame, text="Save Directory:").grid(row=0, column=0, sticky='w', pady=5)
         
-        self.save_dir_var = tk.StringVar(value=self.config.get_save_directory())
+        self.save_dir_var = tk.StringVar(value=self.scope.config.get_save_directory())
         save_dir_entry = ttk.Entry(frame, textvariable=self.save_dir_var, width=40)
         save_dir_entry.grid(row=0, column=1, sticky='ew', pady=5, padx=(5, 0))
         
@@ -75,7 +76,7 @@ class ScopeCaptureGUI(tk.Tk):
         # Filename
         ttk.Label(frame, text="Filename:").grid(row=1, column=0, sticky='w', pady=5)
         
-        self.filename_var = tk.StringVar(value=self.config.get_default_filename())
+        self.filename_var = tk.StringVar(value=self.scope.config.get_default_filename())
         filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
         filename_entry.grid(row=1, column=1, sticky='ew', pady=5, padx=(5, 0))
         
@@ -117,8 +118,10 @@ class ScopeCaptureGUI(tk.Tk):
         self.metadata_frame = ttk.Frame(frame)
         self.metadata_frame.pack(fill='both', expand=True)
         
-        # Example of adding a metadata field
-        # self.add_metadata_field("Project", "")
+        # Load metadata from config
+        metadata = self.scope.config.get_metadata_fields()
+        if metadata:
+            self.update_metadata_fields(metadata)
     
     def add_metadata_field(self, key, value=""):
         """Dynamically add a metadata field to the metadata tab"""
@@ -154,12 +157,18 @@ class ScopeCaptureGUI(tk.Tk):
     def scan_for_scope(self):
         """Scan for connected oscilloscope"""
         try:
-            result = self.scope_controller.scan_for_devices()
+            # First scan for all available instruments
+            self.scope.scan_for_instruments()
+            
+            # Attempt to auto-connect to a supported scope
+            result = self.scope.auto_setup_scope()
+            
             if result:
                 self.connection_status.config(text="Status: Connected")
-                self.device_info.config(text=f"Device: {result}")
+                device_info = self.scope.get_device_info()
+                self.device_info.config(text=f"Device: {device_info}")
             else:
-                self.connection_status.config(text="Status: No scope found")
+                self.connection_status.config(text="Status: No supported scope found")
                 self.device_info.config(text="No device detected")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to scan for scope: {str(e)}")
@@ -171,10 +180,12 @@ class ScopeCaptureGUI(tk.Tk):
         directory = filedialog.askdirectory(initialdir=self.save_dir_var.get())
         if directory:
             self.save_dir_var.set(directory)
+            # Update config
+            self.scope.config.set_save_directory(directory)
     
     def capture_screenshot(self):
         """Capture screenshot from the oscilloscope"""
-        if not self.scope_controller.is_connected():
+        if not self.scope.is_connected():
             messagebox.showwarning("Not Connected", "No oscilloscope connected. Please scan for devices first.")
             return
         
@@ -183,15 +194,12 @@ class ScopeCaptureGUI(tk.Tk):
         bg_color = self.bg_color_var.get()
         save_waveform = self.save_waveform_var.get()
         
-        # Make sure the directory exists
-        Path(save_dir).mkdir(parents=True, exist_ok=True)
-        
         try:
             # Get metadata
             metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()}
             
             # Capture the screenshot
-            file_path = self.scope_controller.capture_screenshot(
+            file_path = self.scope.capture(
                 save_dir, filename, bg_color, save_waveform, metadata
             )
             
@@ -207,8 +215,6 @@ class ScopeCaptureGUI(tk.Tk):
     def _increment_filename(self, filename):
         """Increment the counter in the filename"""
         # Find the last sequence of digits in the filename
-        import re
-        
         file_path = Path(filename)
         base = file_path.stem
         ext = file_path.suffix

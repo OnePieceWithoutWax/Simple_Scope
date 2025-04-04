@@ -4,7 +4,8 @@ Oscilloscope Screenshot Capture Application
 Entry point for the application
 """
 
-import sys, os
+import sys
+import os
 from pathlib import Path
 from app.gui import ScopeCaptureGUI
 

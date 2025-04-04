@@ -2,10 +2,14 @@
 Controller for communicating with the oscilloscope via pyvisa
 """
 
-from .base_scope_driver import * # import everything from base_scope_controller...or is that bad practice?
+import time
+import pathlib
+from pathlib import Path
+from .base_scope_driver import ScopeDriver
 
 class TektronixScopeDriver(ScopeDriver):
     """Controller class for Tektronix MSO5x oscilloscope"""
+    
     
     def capture_screenshot(self, save_dir, filename, bg_color="white", save_waveform=False, metadata=None):
         """
@@ -25,7 +29,7 @@ class TektronixScopeDriver(ScopeDriver):
             raise ValueError("No oscilloscope connected")
         
         # Create full path and ensure directory exists
-        save_path = pathlib.Path(save_dir)
+        save_path = Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
         file_path = save_path / filename
         
@@ -55,7 +59,8 @@ class TektronixScopeDriver(ScopeDriver):
         except Exception as e:
             print(f"Error capturing screenshot: {str(e)}")
             raise
-    
+
+
     def _save_waveform_data(self, file_path):
         """
         Save waveform data to a CSV file
@@ -89,5 +94,3 @@ class TektronixScopeDriver(ScopeDriver):
                     
         except Exception as e:
             print(f"Error saving waveform data: {str(e)}")
-    
-

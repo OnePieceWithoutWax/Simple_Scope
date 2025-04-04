@@ -8,9 +8,10 @@ import pyvisa
 class ScopeDriver:
     """Base Controller class for oscilloscope"""
     
-    def __init__(self, address=None):
+    def __init__(self, address=None, name=None):
         self.resource_manager = None
         self.adaptor = None
+        self.name = name
         self._address = None
         
         self.address = address  # property to set the address
@@ -31,10 +32,12 @@ class ScopeDriver:
         if address is not None:
             self.connect()  # Attempt to connect to the new address
 
-
-    def connect(self):
+    def connect(self, address=None):
         """Connect to the oscilloscope"""
-        if self.address is None:
+        if address is not None:
+            self.address = address
+
+        if self.address is None: # assert self.address is not None,
             raise ValueError("Device address is not set.")
         
         self.resource_manager = pyvisa.ResourceManager()
