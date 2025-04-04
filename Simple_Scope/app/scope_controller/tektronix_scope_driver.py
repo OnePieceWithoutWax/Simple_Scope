@@ -35,8 +35,9 @@ class TektronixScopeDriver(ScopeDriver):
         # Create full path and ensure directory exists
         save_path = Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
-        filename_suffix = filename+suffix
-        file_path = save_path / filename_suffix
+        if not filename.endswith(suffix):
+            filename = filename+suffix
+        file_path = save_path / filename
         
         try:
             imgData = self.get_screenshot_brian()
