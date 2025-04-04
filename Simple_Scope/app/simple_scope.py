@@ -120,7 +120,7 @@ class SimpleScope:
             return self.device_id
         return None
 
-    def capture(self, save_dir=None, filename=None, bg_color="white", save_waveform=False, metadata=None):
+    def capture(self, save_dir=None, filename=None, suffix=None, bg_color="white", save_waveform=False, metadata=None):
         """
         Capture a screenshot from the connected oscilloscope
         
@@ -143,14 +143,17 @@ class SimpleScope:
             
         if filename is None:
             filename = self.config.get_default_filename()
-        
+
+        if suffix is None:
+            suffix = self.config.get_default_suffix()
+
         # Ensure directory exists
         save_path = Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
         
         # Capture screenshot
         file_path = self.scope.capture_screenshot(
-            save_dir, filename, bg_color, save_waveform, metadata
+            save_dir, filename, suffix, bg_color, save_waveform, metadata
         )
             
         # Save metadata if provided

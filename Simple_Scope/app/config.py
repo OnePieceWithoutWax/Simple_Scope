@@ -27,7 +27,7 @@ class AppConfig:
         # Default configuration
         self.config = {
             "save_directory": str(Path.home() / "projects" / "scope_capture"),
-            "default_filename": "capture_001.png",
+            "default_filename": "capture_001", # No suffix required
             "file_format": "png",
             "background_color": "white",
             "save_waveform": False,
@@ -80,10 +80,16 @@ class AppConfig:
         
         self.save_config()
     
+    def get_default_suffix(self):
+        """Get the default filename"""
+        if '.' not in self.config["file_format"]:
+            self.config["file_format"] = '.' + self.config["file_format"]
+        return self.config["file_format"]
+
     def get_default_filename(self):
         """Get the default filename"""
         return self.config["default_filename"]
-    
+
     def set_default_filename(self, filename):
         """Set the default filename"""
         self.config["default_filename"] = filename
