@@ -191,3 +191,30 @@ class SimpleScope:
             f.write("Custom Metadata:\n")
             for key, value in self.meta.items():
                 f.write(f"{key}: {value}\n")
+
+
+    # TODO we should be keeping track of the filename here, as its is backend responsibility
+            # next_filename = self._increment_filename(filename)
+            # self.filename_var.set(next_filename)
+    # def _increment_filename(self, filename):
+    #     """Increment the counter in the filename"""
+    #     # Find the last sequence of digits in the filename
+    #     file_path = Path(filename)
+    #     base = file_path.stem
+    #     ext = file_path.suffix
+    #     match = re.search(r'(\d+)(?!.*\d)', base)
+        
+    #     if match:
+    #         # Extract the counter value and its position
+    #         counter_str = match.group(1)
+    #         counter_val = int(counter_str)
+            
+    #         # Increment and pad with zeros to maintain the same length
+    #         new_counter = str(counter_val + 1).zfill(len(counter_str))
+            
+    #         # Replace the old counter with the new one
+    #         new_base = base[:match.start(1)] + new_counter + base[match.end(1):]
+    #         return new_base + ext
+    #     else:
+    #         # If no counter found, just append _001
+    #         return base + "_001" + ext

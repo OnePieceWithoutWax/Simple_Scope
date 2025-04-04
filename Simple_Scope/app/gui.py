@@ -191,6 +191,7 @@ class ScopeCaptureGUI(tk.Tk):
         
         save_dir = self.save_dir_var.get()
         filename = self.filename_var.get()
+        suffix = self.file_format_var.get()
         bg_color = self.bg_color_var.get()
         save_waveform = self.save_waveform_var.get()
         
@@ -200,7 +201,7 @@ class ScopeCaptureGUI(tk.Tk):
             
             # Capture the screenshot
             file_path = self.scope.capture(
-                save_dir, filename, bg_color, save_waveform, metadata
+                save_dir, filename, suffix, bg_color, save_waveform, metadata
             )
             
             messagebox.showinfo("Success", f"Screenshot saved to: {file_path}")
