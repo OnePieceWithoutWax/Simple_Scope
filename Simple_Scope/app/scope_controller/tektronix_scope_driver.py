@@ -11,13 +11,10 @@ class TektronixScopeDriver(ScopeDriver):
     """Controller class for Tektronix MSO5x oscilloscope"""
     
 
-# The commented out `capture_screenshot_AI` method in the TektronixScopeDriver class is a method
-# intended to capture a screenshot from the connected oscilloscope. It takes several parameters such
-# as the directory to save the screenshot, the filename, background color, whether to save waveform
-# data, and optional metadata.
-    def capture_screenshot(self, save_dir, filename, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
+
+    def save_screenshot(self, save_dir, filename, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
         """
-        Capture a screenshot from the connected oscilloscope
+        Capture a screenshot from the connected oscilloscope and save it
         
         Args:
             save_dir (str or Path): Directory to save the screenshot
@@ -35,8 +32,7 @@ class TektronixScopeDriver(ScopeDriver):
         # Create full path and ensure directory exists
         save_path = Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
-        if not filename.endswith(suffix):
-            filename = filename+suffix
+        filename = self.filename_with_suffix(filename, suffix)
         file_path = save_path / filename
         
         try:
@@ -47,7 +43,7 @@ class TektronixScopeDriver(ScopeDriver):
                 # file = open(fileName, "wb") # Save image data to local disk
                 file.write(imgData)
                 file.close()
-                self.adaptor.write('FILESystem:DELEte "C:/Temp.png"') # Remvoe the Temp.png file
+
             print(f"Saved: {file_path}")
             
             # Save waveform data if requested
@@ -61,22 +57,23 @@ class TektronixScopeDriver(ScopeDriver):
             print(f"Error capturing screenshot: {str(e)}") #logging?
             raise
 
+    def capture_screenshot(self, *args, **kwargs): #, save_dir=None, filename=None, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
+        ''' Returns an image of the scope screen, does not save it to disk. use save_screenshot() for that'''
+        return self.get_screenshot_brian()
 
     def get_screenshot_brian(self):
-    # def scope_capture(filename, path=None, suffix=".png"
-
+        ''' This method works when and AI cant figure it out'''
         #Screen Capture on Tektronix Windows Scope
         self.adaptor.write('SAVE:IMAGe \"C:/Temp.png\"') # Take a scope shot
         self.adaptor.query('*OPC?') # Wait for instrument to finish writing image to disk
-        self.adaptor.write('FILESystem:READFile "C:/Temp.png"') # Read image file from instrument
         
-        return self.adaptor.read_raw(1024*1024)
-        # with open(file_path, "wb") as file:
-        #     # file = open(fileName, "wb") # Save image data to local disk
-        #     file.write(imgData)
-        #     file.close()
-        #     scope.write('FILESystem:DELEte "C:/Temp.png"') # Remvoe the Temp.png file
-        # print(f"Saved: {file_path}")
+        self.adaptor.write('FILESystem:READFile "C:/Temp.png"') # Read temp image file from instrument
+        
+        img_data = self.adaptor.read_raw(1024*1024) # return that read...
+        
+        self.adaptor.write('FILESystem:DELEte "C:/Temp.png"') # Remove the Temp.png file
+        
+        return img_data
 
 
     def _save_waveform_data(self, file_path):
@@ -113,7 +110,10 @@ class TektronixScopeDriver(ScopeDriver):
         except Exception as e:
             print(f"Error saving waveform data: {str(e)}")
 
-
+# The commented out `capture_screenshot_AI` method in the TektronixScopeDriver class is a method
+# intended to capture a screenshot from the connected oscilloscope. It takes several parameters such
+# as the directory to save the screenshot, the filename, background color, whether to save waveform
+# data, and optional metadata.
         #needs work. but this is closer to how we want to save the data
     # def capture_screenshot_AI(self, save_dir, filename, bg_color="white", save_waveform=False, metadata=None):
     #     """

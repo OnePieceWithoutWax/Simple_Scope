@@ -6,7 +6,12 @@ import pathlib
 import pyvisa
 
 class ScopeDriver:
-    """Base Controller class for oscilloscope"""
+    """Base Controller class for oscilloscope
+    methods intended to be overridden in subclasses should have:
+    args and kwargs, and NotImplementedError
+    b/c we had issue with args mismatch that was "hard" to debug
+    since we didnt see the NotImplementedError, we were debugging the wrong thing
+    """
     
     def __init__(self, address=None, name=None):
         self.resource_manager = None
@@ -71,6 +76,28 @@ class ScopeDriver:
         return self.adaptor is not None
     
     
+    @staticmethod
+    def filename_with_suffix(filename: str, suffix: str) -> str: 
+        """
+        Append suffix to filename before the extension
+        
+        Args:
+            filename (str): Original filename
+            suffix (str): Suffix to append
+            
+        Returns:
+            str: Filename with appended suffix
+        """
+        if not suffix.startswith("."):
+            suffix = "." + suffix
+        
+        if filename.endswith(suffix):
+            return filename
+        
+        filename = filename + suffix
+        return filename   
+
+
     def capture_screenshot(self, save_dir, filename, suffix='.png',  bg_color="white", save_waveform=False, metadata=None, *args, **kwargs):
         """
         Capture a screenshot from the connected oscilloscope
@@ -89,7 +116,7 @@ class ScopeDriver:
         raise NotImplementedError("This method should be implemented in a subclass.")
         
     
-    def _save_waveform_data(self, file_path):
+    def _save_waveform_data(self, file_path, *args, **kwargs):
         """
         Save waveform data to a CSV file
         
@@ -97,3 +124,4 @@ class ScopeDriver:
             file_path (Path or str): Path to save the waveform data
         """        
         raise NotImplementedError("This method should be implemented in a subclass.")
+
