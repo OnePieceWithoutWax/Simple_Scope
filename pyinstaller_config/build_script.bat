@@ -24,10 +24,10 @@ call %conda_folder%\condabin\conda.bat activate simplescope
 echo Building Simple_Scope packages...
 
 echo Building single-file executable...
-call pyinstaller single_file.spec
+call pyinstaller single_file.py
 
 echo Building directory structure...
-call pyinstaller directory.spec
+call pyinstaller directory.py
 
 echo Done! Built packages are in the 'dist' folder.
 pause
