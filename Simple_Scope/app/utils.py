@@ -128,7 +128,7 @@ def filename_with_suffix(filename: str, suffix: str) -> str:
     return filename
 
 
-def increment_filename(self, filename):
+def increment_filename(filename):
     """Increment the counter in the filename"""
     # Find the last sequence of digits in the filename
     file_path = Path(filename)
