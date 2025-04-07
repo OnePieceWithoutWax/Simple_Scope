@@ -41,4 +41,5 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='single_file',
+    distpath='../dist/onefile'  # Custom output directory
 )
