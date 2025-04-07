@@ -52,7 +52,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Add an icon path here if you have one
+    icon=str(base_path / r'Simple_Scope/resources/icons/simple_scope_icon.ico'),  # Add an icon path here if you have one
 )
 
 coll = COLLECT(
@@ -64,5 +64,5 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='Simple_Scope',
-    distpath='./dist/directory'  # Custom output directory
+    distpath=str(base_path / 'dist' / 'onefile'),  # Custom output directory
 )
