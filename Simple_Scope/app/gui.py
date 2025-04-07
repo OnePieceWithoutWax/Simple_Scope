@@ -28,6 +28,7 @@ class ScopeCaptureGUI(tk.Tk):
         self.setup_tab = ttk.Frame(self.notebook)
         self.main_tab = ttk.Frame(self.notebook)
         self.metadata_tab = ttk.Frame(self.notebook)
+        self.metadata_fields = {}
         
         self.notebook.add(self.main_tab, text="Scope")
         self.notebook.add(self.setup_tab, text="Setup")
