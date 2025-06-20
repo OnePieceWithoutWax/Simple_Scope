@@ -1,0 +1,36 @@
+name: simplescope
+channels:
+  - conda-forge
+dependencies:
+  - altgraph=0.17.4=pyhd8ed1ab_1
+  - bzip2=1.0.8=h2466b09_7
+  - ca-certificates=2025.1.31=h56e8100_0
+  - future=1.0.0=pyhd8ed1ab_2
+  - importlib-metadata=8.6.1=pyha770c72_0
+  - libexpat=2.7.0=he0c23c2_0
+  - libffi=3.4.6=h537db12_1
+  - liblzma=5.6.4=h2466b09_0
+  - libmpdec=4.0.0=h2466b09_0
+  - libsqlite=3.49.1=h67fdade_2
+  - libzlib=1.3.1=h2466b09_2
+  - nomkl=1.0=h5ca1d4c_0
+  - openssl=3.4.1=ha4e3fda_0
+  - packaging=24.2=pyhd8ed1ab_2
+  - pefile=2023.2.7=pyhd8ed1ab_0
+  - pip=25.0.1=pyh145f28c_0
+  - pyinstaller=6.12.0=py313h096ef60_0
+  - pyinstaller-hooks-contrib=2025.2=pyhd8ed1ab_0
+  - python=3.13.2=h261c0b1_101_cp313
+  - python_abi=3.13=6_cp313
+  - pyvisa=1.14.1=pyhd8ed1ab_1
+  - pywin32=307=py313h5813708_3
+  - pywin32-ctypes=0.2.3=py313hfa70ccb_1
+  - setuptools=75.8.2=pyhff2d567_0
+  - tk=8.6.13=h5226925_1
+  - typing_extensions=4.13.0=pyh29332c3_1
+  - tzdata=2025b=h78e105d_0
+  - ucrt=10.0.22621.0=h57928b3_1
+  - vc=14.3=h2b53caa_26
+  - vc14_runtime=14.42.34438=hfd919c2_26
+  - zipp=3.21.0=pyhd8ed1ab_1
+prefix: C:\Users\niel.walker\anaconda3\envs\simplescope

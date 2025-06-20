@@ -129,15 +129,25 @@ def filename_with_suffix(filename: str, suffix: str) -> str:
 
 
 def increment_filename(filename):
-    """Increment the counter in the filename"""
-    # Find the last sequence of digits in the filename
+    """
+    Increment the counter in the filename, looking only at digits near the end.
+    
+    Args:
+        filename (str): Original filename (with or without extension)
+        
+    Returns:
+        str: New filename with incremented counter
+    """
+    # Handle the file as a Path object
     file_path = Path(filename)
     base = file_path.stem
-    ext = file_path.suffix
-    match = re.search(r'(\d+)(?!.*\d)', base)
+    ext = file_path.suffix  # Will be empty string if no extension
+    
+    # Look for a pattern like "name_001" at the end of the stem
+    match = re.search(r'_(\d+)$', base)
     
     if match:
-        # Extract the counter value and its position
+        # Extract the counter value
         counter_str = match.group(1)
         counter_val = int(counter_str)
         
@@ -145,8 +155,8 @@ def increment_filename(filename):
         new_counter = str(counter_val + 1).zfill(len(counter_str))
         
         # Replace the old counter with the new one
-        new_base = base[:match.start(1)] + new_counter + base[match.end(1):]
+        new_base = base[:match.start(1)] + new_counter
         return new_base + ext
     else:
-        # If no counter found, just append _001
+        # If no counter found in the correct format, append _001
         return base + "_001" + ext

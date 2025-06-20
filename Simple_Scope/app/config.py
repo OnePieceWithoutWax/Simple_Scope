@@ -26,7 +26,7 @@ class AppConfig:
         
         # Default configuration
         self.config = {
-            "save_directory": str(Path.home() / "projects" / "scope_capture"),
+            "save_directory": str(Path.home() / "Pictures" / "scope_capture"),
             "default_filename": "capture_001", # No suffix required
             "filename": None,
             "file_format": "png",
