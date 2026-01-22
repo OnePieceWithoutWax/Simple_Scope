@@ -6,7 +6,6 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from app.simple_scope import SimpleScope
-from app.utils import increment_filename, filename_with_datestamp
 
 class ScopeCaptureGUI(tk.Tk):
     """Main application window for the oscilloscope capture tool"""
@@ -81,7 +80,12 @@ class ScopeCaptureGUI(tk.Tk):
         engineering_btn = ttk.Radiobutton(layout_frame, text="Engineering",
                                           variable=self.layout_mode_var, value="Engineering",
                                           command=self._redraw_capture_content)
-        engineering_btn.pack(side='left')
+        engineering_btn.pack(side='left', padx=(0, 10))
+
+        advanced_btn = ttk.Radiobutton(layout_frame, text="Advanced",
+                                       variable=self.layout_mode_var, value="Advanced",
+                                       command=self._redraw_capture_content)
+        advanced_btn.pack(side='left')
 
         # Separator
         ttk.Separator(self.capture_tab, orient='horizontal').pack(fill='x', padx=20)
@@ -107,8 +111,10 @@ class ScopeCaptureGUI(tk.Tk):
 
         if layout == "Basic":
             self._draw_basic_layout()
-        else:
+        elif layout == "Engineering":
             self._draw_engineering_layout()
+        else:
+            self._draw_advanced_layout()
 
     def _draw_basic_layout(self):
         """Draw the Basic layout for capture tab"""
@@ -134,11 +140,241 @@ class ScopeCaptureGUI(tk.Tk):
         capture_button.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
 
     def _draw_engineering_layout(self):
-        """Draw the Engineering layout for capture tab (placeholder)"""
+        """Draw the Engineering layout for capture tab with labeled subdirectory rows"""
         frame = ttk.Frame(self.capture_content_frame, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
-        ttk.Label(frame, text="Engineering layout - Coming soon").pack(pady=20)
+        # Browse button
+        browse_button = ttk.Button(frame, text="Browse", command=self.browse_directory)
+        browse_button.grid(row=0, column=0, sticky='w', pady=5)
+
+        # Save Directory
+        ttk.Label(frame, text="Save Directory:").grid(row=1, column=0, sticky='w', pady=5)
+        save_dir_entry = ttk.Entry(frame, textvariable=self.save_dir_var, width=60)
+        save_dir_entry.grid(row=1, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
+
+        # Subdirectories section
+        ttk.Separator(frame, orient='horizontal').grid(row=2, column=0, columnspan=4, sticky='ew', pady=10)
+
+        ttk.Label(frame, text="Subdirectories:").grid(row=3, column=0, sticky='w', pady=5)
+
+        # Container for subdirectory rows
+        self.subdir_rows_frame = ttk.Frame(frame)
+        self.subdir_rows_frame.grid(row=4, column=0, columnspan=4, sticky='ew', pady=5)
+
+        # Initialize subdirectory rows list
+        self.subdir_rows = []
+
+        # Add default labeled rows
+        self._add_labeled_subdir_row("IC Part Number:", "Unknown")
+        self._add_labeled_subdir_row("Test:", "test")
+
+        ttk.Separator(frame, orient='horizontal').grid(row=5, column=0, columnspan=4, sticky='ew', pady=10)
+
+        # Filename
+        ttk.Label(frame, text="Filename:").grid(row=6, column=0, sticky='w', pady=5)
+        filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
+        filename_entry.grid(row=6, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
+
+        # Capture button
+        capture_button = ttk.Button(frame, text="Capture", command=self._capture_engineering)
+        capture_button.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+
+    def _add_labeled_subdir_row(self, label, default_value=""):
+        """Add a labeled subdirectory row with a default value"""
+        row_frame = ttk.Frame(self.subdir_rows_frame)
+        row_frame.pack(fill='x', pady=2)
+
+        row_data = {'frame': row_frame, 'entries': [], 'label': label}
+        row_index = len(self.subdir_rows)
+
+        # Add label
+        ttk.Label(row_frame, text=label, width=15).pack(side='left', padx=(0, 5))
+
+        # Add first text box with default value
+        entry_var = tk.StringVar(value=default_value)
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+        entry.pack(side='left', padx=(0, 5))
+        row_data['entries'].append(entry_var)
+
+        # Add field button
+        add_field_btn = ttk.Button(row_frame, text="+", width=3,
+                                   command=lambda idx=row_index: self._add_field_to_row(idx))
+        add_field_btn.pack(side='left', padx=(0, 5))
+        row_data['add_btn'] = add_field_btn
+
+        self.subdir_rows.append(row_data)
+
+    def _capture_engineering(self):
+        """Capture screenshot with engineering subdirectory support"""
+        if not self.scope.is_connected():
+            messagebox.showwarning("Not Connected", "No oscilloscope connected. Please scan for devices first.")
+            return
+
+        try:
+            base_save_dir = Path(self.save_dir_var.get())
+            subdir_path = self._get_subdirectory_path()
+            save_dir = base_save_dir / subdir_path
+
+            # Create subdirectory if it doesn't exist
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            base_filename = self.filename_var.get()
+            suffix = self.file_format_var.get()
+
+            # Get filename using SimpleScope API (handles auto_increment/datestamp)
+            filename_ = self.scope.get_capture_filename(str(save_dir), base_filename, suffix)
+
+            self.scope.capture(save_dir=str(save_dir),
+                               filename=Path(filename_).stem,
+                               suffix=suffix,
+                               bg_color=self.bg_color_var.get(),
+                               save_waveform=self.save_waveform_var.get(),
+                               metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
+                               )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
+
+    def _draw_advanced_layout(self):
+        """Draw the Advanced layout for capture tab with subdirectory support"""
+        frame = ttk.Frame(self.capture_content_frame, padding=(20, 10))
+        frame.pack(fill='both', expand=True)
+
+        # Browse button
+        browse_button = ttk.Button(frame, text="Browse", command=self.browse_directory)
+        browse_button.grid(row=0, column=0, sticky='w', pady=5)
+
+        # Save Directory
+        ttk.Label(frame, text="Save Directory:").grid(row=1, column=0, sticky='w', pady=5)
+        save_dir_entry = ttk.Entry(frame, textvariable=self.save_dir_var, width=60)
+        save_dir_entry.grid(row=1, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
+
+        # Subdirectories section
+        ttk.Separator(frame, orient='horizontal').grid(row=2, column=0, columnspan=4, sticky='ew', pady=10)
+
+        subdir_header_frame = ttk.Frame(frame)
+        subdir_header_frame.grid(row=3, column=0, columnspan=4, sticky='w')
+
+        ttk.Label(subdir_header_frame, text="Subdirectories:").pack(side='left')
+        add_row_btn = ttk.Button(subdir_header_frame, text="+ Add Row",
+                                 command=self._add_subdirectory_row)
+        add_row_btn.pack(side='left', padx=(10, 0))
+
+        # Container for subdirectory rows
+        self.subdir_rows_frame = ttk.Frame(frame)
+        self.subdir_rows_frame.grid(row=4, column=0, columnspan=4, sticky='ew', pady=5)
+
+        # Initialize subdirectory rows list
+        self.subdir_rows = []
+
+        ttk.Separator(frame, orient='horizontal').grid(row=5, column=0, columnspan=4, sticky='ew', pady=10)
+
+        # Filename
+        ttk.Label(frame, text="Filename:").grid(row=6, column=0, sticky='w', pady=5)
+        filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
+        filename_entry.grid(row=6, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
+
+        # Capture button
+        capture_button = ttk.Button(frame, text="Capture", command=self._capture_advanced)
+        capture_button.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+
+    def _add_subdirectory_row(self):
+        """Add a new subdirectory row with text boxes"""
+        row_frame = ttk.Frame(self.subdir_rows_frame)
+        row_frame.pack(fill='x', pady=2)
+
+        row_data = {'frame': row_frame, 'entries': []}
+        row_index = len(self.subdir_rows)
+
+        # Add first text box
+        entry_var = tk.StringVar()
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+        entry.pack(side='left', padx=(0, 5))
+        row_data['entries'].append(entry_var)
+
+        # Add field button
+        add_field_btn = ttk.Button(row_frame, text="+", width=3,
+                                   command=lambda idx=row_index: self._add_field_to_row(idx))
+        add_field_btn.pack(side='left', padx=(0, 5))
+        row_data['add_btn'] = add_field_btn
+
+        # Remove row button
+        remove_btn = ttk.Button(row_frame, text="X", width=3,
+                                command=lambda idx=row_index: self._remove_subdirectory_row(idx))
+        remove_btn.pack(side='left', padx=(5, 0))
+        row_data['remove_btn'] = remove_btn
+
+        self.subdir_rows.append(row_data)
+
+    def _add_field_to_row(self, row_index):
+        """Add another text box to a subdirectory row"""
+        if row_index >= len(self.subdir_rows):
+            return
+
+        row_data = self.subdir_rows[row_index]
+        row_frame = row_data['frame']
+
+        # Create new entry
+        entry_var = tk.StringVar()
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+
+        # Insert before the add button
+        entry.pack(side='left', padx=(0, 5), before=row_data['add_btn'])
+        row_data['entries'].append(entry_var)
+
+    def _remove_subdirectory_row(self, row_index):
+        """Remove a subdirectory row"""
+        if row_index >= len(self.subdir_rows):
+            return
+
+        row_data = self.subdir_rows[row_index]
+        row_data['frame'].destroy()
+        self.subdir_rows[row_index] = None  # Mark as removed
+
+    def _get_subdirectory_path(self):
+        """Build subdirectory path from all rows"""
+        subdirs = []
+        for row_data in self.subdir_rows:
+            if row_data is None:
+                continue
+            # Concatenate entries in this row with '_'
+            parts = [var.get() for var in row_data['entries'] if var.get().strip()]
+            if parts:
+                subdirs.append('_'.join(parts))
+
+        return Path(*subdirs) if subdirs else Path()
+
+    def _capture_advanced(self):
+        """Capture screenshot with advanced subdirectory support"""
+        if not self.scope.is_connected():
+            messagebox.showwarning("Not Connected", "No oscilloscope connected. Please scan for devices first.")
+            return
+
+        try:
+            base_save_dir = Path(self.save_dir_var.get())
+            subdir_path = self._get_subdirectory_path()
+            save_dir = base_save_dir / subdir_path
+
+            # Create subdirectory if it doesn't exist
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            base_filename = self.filename_var.get()
+            suffix = self.file_format_var.get()
+
+            # Get filename using SimpleScope API (handles auto_increment/datestamp)
+            filename_ = self.scope.get_capture_filename(str(save_dir), base_filename, suffix)
+
+            self.scope.capture(save_dir=str(save_dir),
+                               filename=Path(filename_).stem,
+                               suffix=suffix,
+                               bg_color=self.bg_color_var.get(),
+                               save_waveform=self.save_waveform_var.get(),
+                               metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
+                               )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
 
     def _initialize_config_tab(self):
         """Initialize the Config tab with file format, background, and waveform settings"""
@@ -277,24 +513,20 @@ class ScopeCaptureGUI(tk.Tk):
             return
 
         try:
-            filename_ = self.filename_var.get()
+            save_dir = self.save_dir_var.get()
+            base_filename = self.filename_var.get()
+            suffix = self.file_format_var.get()
 
-            # Apply datestamp if enabled
-            if self.datestamp_var.get():
-                filename_ = filename_with_datestamp(filename_)
+            # Get filename using SimpleScope API (handles auto_increment/datestamp)
+            filename_ = self.scope.get_capture_filename(save_dir, base_filename, suffix)
 
-            # Capture the screenshot
-            file_path = self.scope.capture(save_dir = self.save_dir_var.get(),
-                                            filename = filename_,
-                                            suffix = self.file_format_var.get(),
-                                            bg_color = self.bg_color_var.get(),
-                                            save_waveform = self.save_waveform_var.get(),
-                                            metadata = {key: var.get() for key, (_, var) in self.metadata_fields.items()}
-                                            )
-
-            # Update filename for next capture if auto increment is enabled
-            if self.auto_increment_var.get():
-                self.filename_var.set(increment_filename(self.filename_var.get()))
+            self.scope.capture(save_dir=save_dir,
+                               filename=Path(filename_).stem,
+                               suffix=suffix,
+                               bg_color=self.bg_color_var.get(),
+                               save_waveform=self.save_waveform_var.get(),
+                               metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
+                               )
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")

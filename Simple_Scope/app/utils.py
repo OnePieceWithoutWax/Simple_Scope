@@ -128,86 +128,69 @@ def filename_with_suffix(filename: str, suffix: str) -> str:
     return filename
 
 
-def get_new_filepath(filename, directory, suffix=""):
+def get_next_incremented_filename(directory, base_filename, suffix):
     """
-    Generate a new filename by incrementing the counter if needed.
-    
-    Args:
-        base_filename (str): The base filename
-    """
-
-
-    
-    filepath = Path(directory) / filename_with_suffix(filename, suffix)
-    if not filepath.exists():
-        return filepath
-    
-    # Extract filenames and sort them
-    existing_filenames = [f.name for f in existing_files]
-    existing_filenames.sort()
-    
-    # Start with the base filename and increment until a unique one is found
-    new_filename = base_filename
-    while new_filename in existing_filenames:
-        new_filename = increment_filename(new_filename)
-    
-    return new_filename
-
-
-def increment_filename(filename):
-    """
-    Increment the counter in the filename.
-    Looks for pattern like "_001" at the end of the filename (before extension).
-    
-    Args:
-        filename (str): Current filename
-        
-    Returns:
-        str: Filename with incremented counter
-    """
-    file_path = Path(filename)
-    base = file_path.stem
-    ext = file_path.suffix
-    
-    # Look for underscore followed by digits at the end of the stem
-    # Pattern: ends with underscore followed by one or more digits
-    match = re.search(r'_(\d+)$', base)
-    
-    if match:
-        # Extract the counter value and its position
-        counter_str = match.group(1)
-        counter_val = int(counter_str)
-        num_digits = len(counter_str)
-        
-        # Increment and pad with zeros to maintain the same length
-        new_counter = str(counter_val + 1).zfill(num_digits)
-        
-        # Replace the old counter with the new one
-        new_base = base[:match.start()] + '_' + new_counter
-        return new_base + ext
-    else:
-        # If no _### pattern found at end, append _001
-        return base + "_001" + ext
-    
-    
-
-def filename_with_datestamp(base_filename):
-    """
-    Generate filename with datestamp appended
+    Find the next available filename by appending _001, _002, etc.
+    Checks if file exists and increments until a free slot is found.
 
     Args:
-        base_filename (str): The base filename
+        directory (str or Path): Directory to check for existing files
+        base_filename (str): Base filename without incrementor
+        suffix (str): File extension (e.g., "png" or ".png")
 
     Returns:
-        str: Filename with datestamp appended
+        str: Filename with incrementor appended (e.g., "capture_001.png")
     """
-    # Get current timestamp
-    timestamp = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+    directory = Path(directory)
+    stem = Path(base_filename).stem
+    ext = suffix if suffix.startswith('.') else '.' + suffix
 
-    # Split filename and extension
-    path = Path(base_filename)
-    stem = path.stem
-    suffix = path.suffix
+    counter = 1
+    while True:
+        # Use zfill(3) for 001-999, allow natural growth beyond
+        if counter < 1000:
+            incrementor = str(counter).zfill(3)
+        else:
+            incrementor = str(counter)
 
-    # Append timestamp before the extension
-    return f"{stem}_{timestamp}{suffix}"
+        new_filename = f"{stem}_{incrementor}{ext}"
+        filepath = directory / new_filename
+
+        if not filepath.exists():
+            return new_filename
+
+        counter += 1
+
+
+def get_filename_with_datestamp(directory, base_filename, suffix):
+    """
+    Generate filename with datestamp appended, handling collisions.
+    If the timestamped filename already exists, waits 100ms and retries
+    (the timestamp will naturally change as time passes).
+
+    Args:
+        directory (str or Path): Directory to check for existing files
+        base_filename (str): Base filename without datestamp
+        suffix (str): File extension (e.g., "png" or ".png")
+
+    Returns:
+        str: Filename with datestamp appended (e.g., "capture_2026.01.22_10.30.45.png")
+    """
+    import time
+
+    directory = Path(directory)
+    stem = Path(base_filename).stem
+    ext = suffix if suffix.startswith('.') else '.' + suffix
+
+    for _ in range(100):  # Try up to 100 times (~10 seconds max)
+        timestamp = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+        new_filename = f"{stem}_{timestamp}{ext}"
+        filepath = directory / new_filename
+
+        if not filepath.exists():
+            return new_filename
+
+        # Wait 100ms for timestamp to change
+        time.sleep(0.1)
+
+    raise ValueError("Could not generate unique filename after 100 attempts")

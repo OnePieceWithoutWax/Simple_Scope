@@ -1,10 +1,8 @@
 import time
-import pathlib
-import re
 from pathlib import Path
 from app.config import AppConfig
 from .pyvisa_utils import find_instruments
-from app.utils import increment_filename, filename_with_suffix
+from app.utils import get_next_incremented_filename, get_filename_with_datestamp, filename_with_suffix
 
 
 class SimpleScope:
@@ -212,7 +210,7 @@ class SimpleScope:
     def save_file(self, save_dir, filename, suffix, file_data):
         filename = filename_with_suffix(filename, suffix)
         file_path = Path(save_dir) / filename
-        
+
         with open(file_path, "wb") as file:
             # file = open(fileName, "wb") # Save image data to local disk
             file.write(file_data)
@@ -221,3 +219,29 @@ class SimpleScope:
         print(f"Saved: {file_path}") #logging?
 
         return file_path
+
+    def get_capture_filename(self, save_dir=None, base_filename=None, suffix=None):
+        """
+        Generate the appropriate filename based on config settings (auto_increment, datestamp).
+
+        Args:
+            save_dir (str or Path, optional): Directory for the file. Defaults to config.
+            base_filename (str, optional): Base filename. Defaults to config.
+            suffix (str, optional): File extension. Defaults to config.
+
+        Returns:
+            str: The generated filename (with extension, without path)
+        """
+        if save_dir is None:
+            save_dir = self.config.get_save_directory()
+        if base_filename is None:
+            base_filename = self.config.get_default_filename()
+        if suffix is None:
+            suffix = self.config.get_default_file_format()
+
+        if self.config.get_auto_increment():
+            return get_next_incremented_filename(save_dir, base_filename, suffix)
+        elif self.config.get_datestamp():
+            return get_filename_with_datestamp(save_dir, base_filename, suffix)
+        else:
+            return filename_with_suffix(base_filename, suffix)
