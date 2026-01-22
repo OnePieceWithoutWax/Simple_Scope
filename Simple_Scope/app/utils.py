@@ -7,7 +7,7 @@ import re
 import platform
 import subprocess
 import os  # Kept for environment variables
-
+import datetime
 
 def expand_environment_vars(path):
     """
@@ -128,35 +128,86 @@ def filename_with_suffix(filename: str, suffix: str) -> str:
     return filename
 
 
-def increment_filename(filename):
+def get_new_filepath(filename, directory, suffix=""):
     """
-    Increment the counter in the filename, looking only at digits near the end.
+    Generate a new filename by incrementing the counter if needed.
     
     Args:
-        filename (str): Original filename (with or without extension)
+        base_filename (str): The base filename
+    """
+
+
+    
+    filepath = Path(directory) / filename_with_suffix(filename, suffix)
+    if not filepath.exists():
+        return filepath
+    
+    # Extract filenames and sort them
+    existing_filenames = [f.name for f in existing_files]
+    existing_filenames.sort()
+    
+    # Start with the base filename and increment until a unique one is found
+    new_filename = base_filename
+    while new_filename in existing_filenames:
+        new_filename = increment_filename(new_filename)
+    
+    return new_filename
+
+
+def increment_filename(filename):
+    """
+    Increment the counter in the filename.
+    Looks for pattern like "_001" at the end of the filename (before extension).
+    
+    Args:
+        filename (str): Current filename
         
     Returns:
-        str: New filename with incremented counter
+        str: Filename with incremented counter
     """
-    # Handle the file as a Path object
     file_path = Path(filename)
     base = file_path.stem
-    ext = file_path.suffix  # Will be empty string if no extension
+    ext = file_path.suffix
     
-    # Look for a pattern like "name_001" at the end of the stem
+    # Look for underscore followed by digits at the end of the stem
+    # Pattern: ends with underscore followed by one or more digits
     match = re.search(r'_(\d+)$', base)
     
     if match:
-        # Extract the counter value
+        # Extract the counter value and its position
         counter_str = match.group(1)
         counter_val = int(counter_str)
+        num_digits = len(counter_str)
         
         # Increment and pad with zeros to maintain the same length
-        new_counter = str(counter_val + 1).zfill(len(counter_str))
+        new_counter = str(counter_val + 1).zfill(num_digits)
         
         # Replace the old counter with the new one
-        new_base = base[:match.start(1)] + new_counter
+        new_base = base[:match.start()] + '_' + new_counter
         return new_base + ext
     else:
-        # If no counter found in the correct format, append _001
+        # If no _### pattern found at end, append _001
         return base + "_001" + ext
+    
+    
+
+def filename_with_datestamp(base_filename):
+    """
+    Generate filename with datestamp appended
+
+    Args:
+        base_filename (str): The base filename
+
+    Returns:
+        str: Filename with datestamp appended
+    """
+    # Get current timestamp
+    timestamp = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+
+    # Split filename and extension
+    path = Path(base_filename)
+    stem = path.stem
+    suffix = path.suffix
+
+    # Append timestamp before the extension
+    return f"{stem}_{timestamp}{suffix}"

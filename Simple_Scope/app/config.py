@@ -27,11 +27,13 @@ class AppConfig:
         # Default configuration
         self.config = {
             "save_directory": str(Path.home() / "Pictures" / "scope_capture"),
-            "default_filename": "capture_001", # No suffix required
+            "default_filename": "capture", # No suffix required
             "filename": None,
             "file_format": "png",
             "background_color": "white",
             "save_waveform": False,
+            "auto_increment": False,
+            "datestamp": False,
             "last_used_metadata": {},
             "recent_directories": [],
         }
@@ -120,6 +122,30 @@ class AppConfig:
     def set_metadata_fields(self, metadata):
         """Set the metadata fields"""
         self.config["last_used_metadata"] = metadata
+        self.save_config()
+
+    def get_auto_increment(self):
+        """Get the auto increment setting"""
+        return self.config.get("auto_increment", False)
+
+    def set_auto_increment(self, enabled):
+        """Set the auto increment setting"""
+        self.config["auto_increment"] = enabled
+        # Auto increment and datestamp are mutually exclusive
+        if enabled:
+            self.config["datestamp"] = False
+        self.save_config()
+
+    def get_datestamp(self):
+        """Get the datestamp setting"""
+        return self.config.get("datestamp", False)
+
+    def set_datestamp(self, enabled):
+        """Set the datestamp setting"""
+        self.config["datestamp"] = enabled
+        # Auto increment and datestamp are mutually exclusive
+        if enabled:
+            self.config["auto_increment"] = False
         self.save_config()
     
     def update_config(self, key, value):
