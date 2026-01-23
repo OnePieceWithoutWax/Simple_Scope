@@ -5,6 +5,7 @@ GUI implementation for the Oscilloscope Screenshot Capture Application
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import webbrowser
 from app.simple_scope import SimpleScope
 
 class ScopeCaptureGUI(tk.Tk):
@@ -28,6 +29,8 @@ class ScopeCaptureGUI(tk.Tk):
         self.capture_tab = ttk.Frame(self.notebook)  # Previously main_tab
         self.config_tab = ttk.Frame(self.notebook)
         self.metadata_tab = ttk.Frame(self.notebook)
+        self.help_tab = ttk.Frame(self.notebook)
+        self.about_tab = ttk.Frame(self.notebook)
         self.metadata_fields = {}
 
         # Layout mode variable
@@ -36,12 +39,16 @@ class ScopeCaptureGUI(tk.Tk):
         self.notebook.add(self.capture_tab, text="Capture")
         self.notebook.add(self.config_tab, text="Config")
         self.notebook.add(self.scope_tab, text="Scope")
+        self.notebook.add(self.help_tab, text="Help")
+        self.notebook.add(self.about_tab, text="About")
 
         # self.notebook.add(self.metadata_tab, text="Metadata")
         # Initialize the tabs
         self._initialize_scope_tab()
         self._initialize_capture_tab()
         self._initialize_config_tab()
+        self._initialize_help_tab()
+        self._initialize_about_tab()
         # self._initialize_metadata_tab()
         
         # Auto-scan for scope on startup
@@ -210,7 +217,7 @@ class ScopeCaptureGUI(tk.Tk):
         row_frame = ttk.Frame(self.subdir_rows_frame)
         row_frame.pack(fill='x', pady=2)
 
-        row_data = {'frame': row_frame, 'entries': [], 'label': label}
+        row_data = {'frame': row_frame, 'entries': [], 'entry_widgets': [], 'label': label}
         row_index = len(self.subdir_rows)
 
         # Add label
@@ -218,15 +225,22 @@ class ScopeCaptureGUI(tk.Tk):
 
         # Add first text box with default value
         entry_var = tk.StringVar(value=default_value)
-        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=20)
         entry.pack(side='left', padx=(0, 5))
         row_data['entries'].append(entry_var)
+        row_data['entry_widgets'].append(entry)
 
         # Add field button
         add_field_btn = ttk.Button(row_frame, text="+", width=3,
                                    command=lambda idx=row_index: self._add_field_to_row(idx))
         add_field_btn.pack(side='left', padx=(0, 5))
         row_data['add_btn'] = add_field_btn
+
+        # Remove field button
+        remove_field_btn = ttk.Button(row_frame, text="-", width=3,
+                                      command=lambda idx=row_index: self._remove_field_from_row(idx))
+        remove_field_btn.pack(side='left', padx=(0, 5))
+        row_data['remove_btn'] = remove_field_btn
 
         self.subdir_rows.append(row_data)
 
@@ -317,14 +331,15 @@ class ScopeCaptureGUI(tk.Tk):
         row_frame = ttk.Frame(self.subdir_rows_frame)
         row_frame.pack(fill='x', pady=2)
 
-        row_data = {'frame': row_frame, 'entries': []}
+        row_data = {'frame': row_frame, 'entries': [], 'entry_widgets': []}
         row_index = len(self.subdir_rows)
 
         # Add first text box
         entry_var = tk.StringVar(value=default_value)
-        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=20)
         entry.pack(side='left', padx=(0, 5))
         row_data['entries'].append(entry_var)
+        row_data['entry_widgets'].append(entry)
 
         # Add field button
         add_field_btn = ttk.Button(row_frame, text="+", width=3,
@@ -332,11 +347,17 @@ class ScopeCaptureGUI(tk.Tk):
         add_field_btn.pack(side='left', padx=(0, 5))
         row_data['add_btn'] = add_field_btn
 
+        # Remove field button
+        remove_field_btn = ttk.Button(row_frame, text="-", width=3,
+                                      command=lambda idx=row_index: self._remove_field_from_row(idx))
+        remove_field_btn.pack(side='left', padx=(0, 5))
+        row_data['remove_field_btn'] = remove_field_btn
+
         # Remove row button
-        remove_btn = ttk.Button(row_frame, text="X", width=3,
-                                command=lambda idx=row_index: self._remove_subdirectory_row(idx))
-        remove_btn.pack(side='left', padx=(5, 0))
-        row_data['remove_btn'] = remove_btn
+        remove_row_btn = ttk.Button(row_frame, text="X", width=3,
+                                    command=lambda idx=row_index: self._remove_subdirectory_row(idx))
+        remove_row_btn.pack(side='left', padx=(5, 0))
+        row_data['remove_row_btn'] = remove_row_btn
 
         self.subdir_rows.append(row_data)
 
@@ -354,11 +375,30 @@ class ScopeCaptureGUI(tk.Tk):
 
         # Create new entry
         entry_var = tk.StringVar()
-        entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
+        entry = ttk.Entry(row_frame, textvariable=entry_var, width=20)
 
         # Insert before the add button
         entry.pack(side='left', padx=(0, 5), before=row_data['add_btn'])
         row_data['entries'].append(entry_var)
+        row_data['entry_widgets'].append(entry)
+
+    def _remove_field_from_row(self, row_index):
+        """Remove the last text box from a subdirectory row"""
+        if row_index >= len(self.subdir_rows):
+            return
+
+        row_data = self.subdir_rows[row_index]
+        if row_data is None:
+            return
+
+        # Keep at least one entry
+        if len(row_data['entries']) <= 1:
+            return
+
+        # Remove last entry widget and variable
+        last_entry = row_data['entry_widgets'].pop()
+        last_entry.destroy()
+        row_data['entries'].pop()
 
     def _remove_subdirectory_row(self, row_index):
         """Remove a subdirectory row"""
@@ -567,3 +607,42 @@ class ScopeCaptureGUI(tk.Tk):
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
+
+    def _initialize_help_tab(self):
+        """Initialize the Help tab"""
+        frame = ttk.Frame(self.help_tab, padding=(20, 10))
+        frame.pack(fill='both', expand=True)
+
+        ttk.Label(frame, text="Help", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 20))
+
+        help_text = "For bug reports or feature requests, please check the About tab for contact information."
+        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(0, 10))
+
+    def _initialize_about_tab(self):
+        """Initialize the About tab with author and project information"""
+        frame = ttk.Frame(self.about_tab, padding=(20, 10))
+        frame.pack(fill='both', expand=True)
+
+        ttk.Label(frame, text="About Simple Scope", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 20))
+
+        # Author info
+        ttk.Label(frame, text="Author:", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(10, 2))
+        ttk.Label(frame, text="Niel Walker").pack(anchor='w', padx=(20, 0))
+
+        # Email
+        ttk.Label(frame, text="Email:", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(10, 2))
+        ttk.Label(frame, text="nielandrewalker@gmail.com").pack(anchor='w', padx=(20, 0))
+
+        # GitHub profile
+        ttk.Label(frame, text="GitHub:", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(10, 2))
+        github_link = tk.Label(frame, text="https://github.com/OnePieceWithoutWax",
+                               fg="blue", cursor="hand2")
+        github_link.pack(anchor='w', padx=(20, 0))
+        github_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/OnePieceWithoutWax"))
+
+        # Project repository
+        ttk.Label(frame, text="Project Repository:", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(10, 2))
+        repo_link = tk.Label(frame, text="https://github.com/OnePieceWithoutWax/Simple_Scope",
+                             fg="blue", cursor="hand2")
+        repo_link.pack(anchor='w', padx=(20, 0))
+        repo_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/OnePieceWithoutWax/Simple_Scope"))
