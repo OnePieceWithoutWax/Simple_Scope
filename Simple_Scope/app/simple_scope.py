@@ -149,10 +149,10 @@ class SimpleScope:
             save_dir = self.config.get_save_directory()
             
         if filename is None:
-            filename = self.config.get_default_filename()
+            filename = self.config.default_filename
 
         if suffix is None:
-            suffix = self.config.get_default_file_format()
+            suffix = self.config.formatted_file_format
 
         # Ensure directory exists
         save_path = Path(save_dir)
@@ -167,7 +167,7 @@ class SimpleScope:
             self._save_metadata(save_dir, filename)
             
             # Update config with the metadata
-            self.config.set_metadata_fields(metadata)
+            self.config.last_used_metadata = metadata
         
         # Update the config with the new directory
         self.config.set_save_directory(save_dir)
@@ -235,13 +235,13 @@ class SimpleScope:
         if save_dir is None:
             save_dir = self.config.get_save_directory()
         if base_filename is None:
-            base_filename = self.config.get_default_filename()
+            base_filename = self.config.default_filename
         if suffix is None:
-            suffix = self.config.get_default_file_format()
+            suffix = self.config.formatted_file_format
 
-        if self.config.get_auto_increment():
+        if self.config.auto_increment:
             return get_next_incremented_filename(save_dir, base_filename, suffix)
-        elif self.config.get_datestamp():
+        elif self.config.datestamp:
             return get_filename_with_datestamp(save_dir, base_filename, suffix)
         else:
             return filename_with_suffix(base_filename, suffix)

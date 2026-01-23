@@ -2,197 +2,168 @@
 Configuration management for the application
 """
 
+from dataclasses import dataclass, field, asdict
 import json
 import re
 from pathlib import Path
+from typing import Any
 
+
+def _default_save_directory() -> str:
+    return str(Path.home() / "Pictures" / "scope_capture")
+
+
+@dataclass
 class AppConfig:
     """Configuration manager for the application"""
-    
-    def __init__(self, config_file=None):
-        """
-        Initialize configuration manager
-        
-        Args:
-            config_file (Path or str, optional): Path to config file. If None, uses default location.
-        """
-        # Default locations
-        self.app_data_dir = Path.home() / ".scope_capture"
-        
-        if config_file is None:
-            self.config_file = self.app_data_dir / "config.json"
-        else:
-            self.config_file = Path(config_file)
-        
-        # Default configuration
-        self.config = {
-            "save_directory": str(Path.home() / "Pictures" / "scope_capture"),
-            "default_filename": "capture", # No suffix required
-            "filename": None,
-            "file_format": "png",
-            "background_color": "white",
-            "save_waveform": False,
-            "auto_increment": False,
-            "datestamp": False,
-            "last_used_metadata": {},
-            "recent_directories": [],
-        }
-        
-        # Load existing configuration if it exists
+
+    # Persisted config fields
+    save_directory: str = field(default_factory=_default_save_directory)
+    default_filename: str = "capture"
+    filename: str | None = None
+    file_format: str = "png"
+    background_color: str = "white"
+    save_waveform: bool = False
+    auto_increment: bool = False
+    datestamp: bool = True
+    last_used_metadata: dict = field(default_factory=dict)
+    recent_directories: list = field(default_factory=list)
+
+    # Non-persisted fields (excluded from JSON)
+    _config_file: Path = field(default=None, repr=False, compare=False)
+    _app_data_dir: Path = field(default=None, repr=False, compare=False)
+    _loading: bool = field(default=True, repr=False, compare=False)
+
+    def __post_init__(self):
+        """Initialize paths and load existing config"""
+        object.__setattr__(self, '_app_data_dir', Path.home() / ".scope_capture")
+
+        if self._config_file is None:
+            object.__setattr__(self, '_config_file', self._app_data_dir / "config.json")
+
         self._load_config()
-    
-    def _load_config(self):
+        object.__setattr__(self, '_loading', False)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Custom setattr to handle auto-save and mutual exclusivity"""
+        # Use object.__setattr__ for private fields to avoid recursion
+        if name.startswith('_'):
+            object.__setattr__(self, name, value)
+            return
+
+        # Handle mutual exclusivity for auto_increment/datestamp
+        if name == 'auto_increment' and value:
+            object.__setattr__(self, 'datestamp', False)
+        elif name == 'datestamp' and value:
+            object.__setattr__(self, 'auto_increment', False)
+
+        # Set the value
+        object.__setattr__(self, name, value)
+
+        # Auto-save (skip during loading)
+        if not getattr(self, '_loading', True):
+            self.save_config()
+
+    @property
+    def formatted_file_format(self) -> str:
+        """File format with dot prefix (.png, .jpg)"""
+        fmt = self.file_format
+        return fmt if fmt.startswith('.') else f'.{fmt}'
+
+    @property
+    def default_save_directory(self) -> str:
+        """Get the default save directory path"""
+        return _default_save_directory()
+
+    def _load_config(self) -> None:
         """Load configuration from file"""
         try:
-            if self.config_file.exists():
-                with open(self.config_file, 'r') as f:
+            if self._config_file.exists():
+                with open(self._config_file, 'r') as f:
                     loaded_config = json.load(f)
-                    # Update existing config with loaded values
-                    self.config.update(loaded_config)
+                    # Update fields with loaded values
+                    for key, value in loaded_config.items():
+                        if hasattr(self, key) and not key.startswith('_'):
+                            object.__setattr__(self, key, value)
         except Exception as e:
             print(f"Error loading configuration: {str(e)}")
-    
-    def save_config(self):
+
+    def save_config(self) -> None:
         """Save configuration to file"""
-        # pass
         try:
             # Ensure directory exists
-            self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(self.config_file, 'w') as f:
-                json.dump(self.config, f, indent=4)
-                
+            self._config_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Filter out private fields for JSON serialization
+            config_dict = {
+                k: v for k, v in asdict(self).items()
+                if not k.startswith('_')
+            }
+
+            with open(self._config_file, 'w') as f:
+                json.dump(config_dict, f, indent=4)
+
         except Exception as e:
-            print(f"Error saving configuration: {str(e)}") #really need to add logging herel
-    
-    
-    def get_save_directory(self):
-        """Get the save directory path"""
-        # Ensure directory exists
-        dir_path = Path(self.config["save_directory"])
+            print(f"Error saving configuration: {str(e)}")
+
+    # Methods with side effects (kept as methods)
+
+    def get_save_directory(self) -> str:
+        """Get the save directory path, creating it if necessary"""
+        dir_path = Path(self.save_directory)
         dir_path.mkdir(parents=True, exist_ok=True)
         return str(dir_path)
-    
-    def set_save_directory(self, directory):
-        """Set the save directory path"""
-        self.config["save_directory"] = str(directory)
-        
+
+    def get_default_save_directory(self) -> str:
+        """Get the default save directory path"""
+        return self.default_save_directory
+
+    def set_save_directory(self, directory: str) -> None:
+        """Set the save directory and update recent directories list"""
         # Add to recent directories if not already present
-        if directory not in self.config["recent_directories"]:
-            self.config["recent_directories"].insert(0, str(directory))
+        if directory not in self.recent_directories:
+            self.recent_directories.insert(0, str(directory))
             # Keep only the most recent 5 directories
-            self.config["recent_directories"] = self.config["recent_directories"][:5]
-        
-        self.save_config()
-    
-    def get_default_file_format(self):
-        """Get the default filename"""
-        if '.' not in self.config["file_format"]:
-            self.config["file_format"] = '.' + self.config["file_format"]
-        return self.config["file_format"]
-    
-    def set_default_file_format(self, file_format):
-        """Get the default filename"""
-        self.config["file_format"] = file_format
+            object.__setattr__(self, 'recent_directories', self.recent_directories[:5])
 
-    def get_default_filename(self):
-        """Get the default filename"""
-        return self.config["default_filename"]
+        self.save_directory = str(directory)
 
-    def get_filename(self):
-        """Get the filename"""
-        if self.config["filename"] is None:
-            return self.get_default_filename()
-        return self.config["filename"]
-
-    def set_filename(self, filename):
-        """Get the filename"""
-        self.config["filename"] = filename
-        self.save_config()
-
-    def set_default_filename(self, filename):
-        """Set the default filename"""
-        self.config["default_filename"] = filename
-        self.save_config()
-    
-    def get_metadata_fields(self):
-        """Get the last used metadata fields"""
-        return self.config["last_used_metadata"]
-    
-    def set_metadata_fields(self, metadata):
-        """Set the metadata fields"""
-        self.config["last_used_metadata"] = metadata
-        self.save_config()
-
-    def get_auto_increment(self):
-        """Get the auto increment setting"""
-        return self.config.get("auto_increment", False)
-
-    def set_auto_increment(self, enabled):
-        """Set the auto increment setting"""
-        self.config["auto_increment"] = enabled
-        # Auto increment and datestamp are mutually exclusive
-        if enabled:
-            self.config["datestamp"] = False
-        self.save_config()
-
-    def get_datestamp(self):
-        """Get the datestamp setting"""
-        return self.config.get("datestamp", False)
-
-    def set_datestamp(self, enabled):
-        """Set the datestamp setting"""
-        self.config["datestamp"] = enabled
-        # Auto increment and datestamp are mutually exclusive
-        if enabled:
-            self.config["auto_increment"] = False
-        self.save_config()
-    
-    def update_config(self, key, value):
-        """Update a configuration value"""
-        if key in self.config:
-            self.config[key] = value
-            self.save_config()
-            return True
-        return False
-    
-    def get_filename_with_suffix(self, filename=''):
-        """Get the default filename"""
-        if '.' not in self.config["file_format"]:
-            self.config["file_format"] = '.' + self.config["file_format"]
-        if not filename.endswith(self.config["file_format"]):
-            filename += self.config["file_format"]
+    def get_filename_with_suffix(self, filename: str = '') -> str:
+        """Get filename with the configured file format suffix"""
+        fmt = self.formatted_file_format
+        if not filename.endswith(fmt):
+            filename += fmt
         return filename
-    
-    def get_next_filename(self, base_dir=None):
+
+    def get_next_filename(self, base_dir: str | Path | None = None) -> str:
         """
         Get the next available filename in sequence
-        
+
         Args:
-            base_dir (Path or str, optional): Directory to check. If None, uses save_directory.
-        
+            base_dir: Directory to check. If None, uses save_directory.
+
         Returns:
-            str: Next available filename
+            Next available filename
         """
         if base_dir is None:
             base_dir = Path(self.get_save_directory())
         else:
             base_dir = Path(base_dir)
-        
-        filename = self.get_default_filename()
+
+        filename = self.default_filename
         stem = Path(filename).stem
         suffix = Path(filename).suffix
-        
+
         # Look for numeric suffix
         match = re.search(r'(\d+)', stem)
-        
+
         if match:
             # Extract base name and number
             base_name = stem[:match.start()]
             num_str = match.group(1)
             num_digits = len(num_str)
             counter = int(num_str)
-            
+
             # Find the next available filename
             while True:
                 counter += 1

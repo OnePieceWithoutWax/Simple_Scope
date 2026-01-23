@@ -96,7 +96,7 @@ class ScopeCaptureGUI(tk.Tk):
 
         # Initialize variables used by capture
         self.save_dir_var = tk.StringVar(value=self.scope.config.get_save_directory())
-        self.filename_var = tk.StringVar(value=self.scope.config.get_default_filename())
+        self.filename_var = tk.StringVar(value=self.scope.config.default_filename)
 
         # Draw initial content
         self._redraw_capture_content()
@@ -115,6 +115,25 @@ class ScopeCaptureGUI(tk.Tk):
             self._draw_engineering_layout()
         else:
             self._draw_advanced_layout()
+
+    def _get_subdirectory_parts(self):
+        """
+        Split the save_directory into default_save_directory and subdirectory parts.
+        Returns a tuple of (default_dir, list of subdirectory parts)
+        """
+        default_dir = Path(self.scope.config.get_default_save_directory())
+        current_dir = Path(self.scope.config.get_save_directory())
+
+        try:
+            # Check if current_dir is relative to default_dir
+            relative_path = current_dir.relative_to(default_dir)
+            # Split the relative path into parts
+            subdirs = list(relative_path.parts)
+        except ValueError:
+            # current_dir is not a subdirectory of default_dir
+            subdirs = []
+
+        return str(default_dir), subdirs
 
     def _draw_basic_layout(self):
         """Draw the Basic layout for capture tab"""
@@ -144,12 +163,16 @@ class ScopeCaptureGUI(tk.Tk):
         frame = ttk.Frame(self.capture_content_frame, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
+        # Get the default directory and any existing subdirectory parts
+        default_dir, subdir_parts = self._get_subdirectory_parts()
+
         # Browse button
         browse_button = ttk.Button(frame, text="Browse", command=self.browse_directory)
         browse_button.grid(row=0, column=0, sticky='w', pady=5)
 
-        # Save Directory
+        # Save Directory - use default_save_directory
         ttk.Label(frame, text="Save Directory:").grid(row=1, column=0, sticky='w', pady=5)
+        self.save_dir_var.set(default_dir)
         save_dir_entry = ttk.Entry(frame, textvariable=self.save_dir_var, width=60)
         save_dir_entry.grid(row=1, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
 
@@ -165,9 +188,11 @@ class ScopeCaptureGUI(tk.Tk):
         # Initialize subdirectory rows list
         self.subdir_rows = []
 
-        # Add default labeled rows
-        self._add_labeled_subdir_row("IC Part Number:", "Unknown")
-        self._add_labeled_subdir_row("Test:", "test")
+        # Add labeled rows with values from subdirectory parts if available
+        ic_part_value = subdir_parts[0] if len(subdir_parts) > 0 else "Unknown"
+        test_value = subdir_parts[1] if len(subdir_parts) > 1 else "test"
+        self._add_labeled_subdir_row("IC Part Number:", ic_part_value)
+        self._add_labeled_subdir_row("Test:", test_value)
 
         ttk.Separator(frame, orient='horizontal').grid(row=5, column=0, columnspan=4, sticky='ew', pady=10)
 
@@ -241,12 +266,16 @@ class ScopeCaptureGUI(tk.Tk):
         frame = ttk.Frame(self.capture_content_frame, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
+        # Get the default directory and any existing subdirectory parts
+        default_dir, subdir_parts = self._get_subdirectory_parts()
+
         # Browse button
         browse_button = ttk.Button(frame, text="Browse", command=self.browse_directory)
         browse_button.grid(row=0, column=0, sticky='w', pady=5)
 
-        # Save Directory
+        # Save Directory - use default_save_directory
         ttk.Label(frame, text="Save Directory:").grid(row=1, column=0, sticky='w', pady=5)
+        self.save_dir_var.set(default_dir)
         save_dir_entry = ttk.Entry(frame, textvariable=self.save_dir_var, width=60)
         save_dir_entry.grid(row=1, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
 
@@ -268,6 +297,10 @@ class ScopeCaptureGUI(tk.Tk):
         # Initialize subdirectory rows list
         self.subdir_rows = []
 
+        # Pre-populate with existing subdirectory parts
+        for subdir_part in subdir_parts:
+            self._add_subdirectory_row_with_value(subdir_part)
+
         ttk.Separator(frame, orient='horizontal').grid(row=5, column=0, columnspan=4, sticky='ew', pady=10)
 
         # Filename
@@ -279,7 +312,7 @@ class ScopeCaptureGUI(tk.Tk):
         capture_button = ttk.Button(frame, text="Capture", command=self._capture_advanced)
         capture_button.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
 
-    def _add_subdirectory_row(self):
+    def _add_subdirectory_row(self, default_value=""):
         """Add a new subdirectory row with text boxes"""
         row_frame = ttk.Frame(self.subdir_rows_frame)
         row_frame.pack(fill='x', pady=2)
@@ -288,7 +321,7 @@ class ScopeCaptureGUI(tk.Tk):
         row_index = len(self.subdir_rows)
 
         # Add first text box
-        entry_var = tk.StringVar()
+        entry_var = tk.StringVar(value=default_value)
         entry = ttk.Entry(row_frame, textvariable=entry_var, width=15)
         entry.pack(side='left', padx=(0, 5))
         row_data['entries'].append(entry_var)
@@ -306,6 +339,10 @@ class ScopeCaptureGUI(tk.Tk):
         row_data['remove_btn'] = remove_btn
 
         self.subdir_rows.append(row_data)
+
+    def _add_subdirectory_row_with_value(self, value):
+        """Add a new subdirectory row pre-populated with a value"""
+        self._add_subdirectory_row(default_value=value)
 
     def _add_field_to_row(self, row_index):
         """Add another text box to a subdirectory row"""
@@ -404,14 +441,14 @@ class ScopeCaptureGUI(tk.Tk):
         save_waveform_check.grid(row=2, column=0, columnspan=2, sticky='w', pady=10)
 
         # Auto increment filename
-        self.auto_increment_var = tk.BooleanVar(value=self.scope.config.get_auto_increment())
+        self.auto_increment_var = tk.BooleanVar(value=self.scope.config.auto_increment)
         self.auto_increment_check = ttk.Checkbutton(frame, text="Auto increment filename",
                                                     variable=self.auto_increment_var,
                                                     command=self._on_auto_increment_changed)
         self.auto_increment_check.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
         # Datestamp filename
-        self.datestamp_var = tk.BooleanVar(value=self.scope.config.get_datestamp())
+        self.datestamp_var = tk.BooleanVar(value=self.scope.config.datestamp)
         self.datestamp_check = ttk.Checkbutton(frame, text="Append datestamp to filename",
                                                variable=self.datestamp_var,
                                                command=self._on_datestamp_changed)
@@ -421,13 +458,13 @@ class ScopeCaptureGUI(tk.Tk):
         """Handle auto increment checkbox change - mutually exclusive with datestamp"""
         if self.auto_increment_var.get():
             self.datestamp_var.set(False)
-        self.scope.config.set_auto_increment(self.auto_increment_var.get())
+        self.scope.config.auto_increment = self.auto_increment_var.get()
 
     def _on_datestamp_changed(self):
         """Handle datestamp checkbox change - mutually exclusive with auto increment"""
         if self.datestamp_var.get():
             self.auto_increment_var.set(False)
-        self.scope.config.set_datestamp(self.datestamp_var.get())
+        self.scope.config.datestamp = self.datestamp_var.get()
         
     def _initialize_metadata_tab(self):
         """Initialize the Metadata tab with dynamic UI elements"""
@@ -442,7 +479,7 @@ class ScopeCaptureGUI(tk.Tk):
         self.metadata_frame.pack(fill='both', expand=True)
         
         # Load metadata from config
-        metadata = self.scope.config.get_metadata_fields()
+        metadata = self.scope.config.last_used_metadata
         if metadata:
             self.update_metadata_fields(metadata)
     
