@@ -3,7 +3,7 @@
 ## Architecture
 
 ### SimpleScope Class
-The `SimpleScope` class (`app/simple_scope.py`) is the core backend and should be able to **operate standalone** (e.g., in Jupyter notebooks, scripts, or other applications) without requiring the GUI.
+The `SimpleScope` class (`app/simple_scope.py`) is the core backend and should be able to **operate standalone** (e.g., in Jupyter notebooks, scripts, or other applications) without requiring the GUI. All logic should be implemented here, and not in the gui layer
 
 Key design principles:
 - `SimpleScope` handles all oscilloscope operations: connection, capture, and file saving
@@ -26,3 +26,4 @@ The GUI (`app/gui.py`) should **only expose the API defined in SimpleScope**. It
 Both options can be off, but they are **mutually exclusive** (both cannot be on):
 - **Auto Increment**: Appends `_001`, `_002`, etc. and increments after each capture
 - **Datestamp**: Appends `_YYYY.MM.DD_HH.MM.SS` timestamp to each capture
+

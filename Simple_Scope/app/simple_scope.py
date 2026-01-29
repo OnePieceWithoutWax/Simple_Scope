@@ -1,6 +1,9 @@
 import time
+from datetime import datetime
 from pathlib import Path
 from app.config import AppConfig
+from app.version import __version__
+from app.logger import Logger
 from .pyvisa_utils import find_instruments
 from app.utils import get_next_incremented_filename, get_filename_with_datestamp, filename_with_suffix
 
@@ -14,11 +17,13 @@ class SimpleScope:
     """
     
     def __init__(self):
+        self.logger = Logger()
         self.scope = None
         self.scope_addr = None
         self.instrument_list = []
         self.meta = {}
         self.config = AppConfig()
+        self.config._logger = self.logger  # Connect logger to config
         self.recent = dict(save_dir = None,
                             filename = None,
                             suffix = None,
@@ -28,7 +33,13 @@ class SimpleScope:
                             )
         self.selected_scope_driver = None
         self.device_id = None
-    
+        self.logger.info("SimpleScope", "Application initialized")
+
+    @property
+    def version(self) -> str:
+        """Get the application version."""
+        return __version__
+
     def scan_for_instruments(self, verbose=False):
         """Scan for connected instruments
         
@@ -38,7 +49,7 @@ class SimpleScope:
         Returns:
             list: List of dictionaries with instrument info
         """
-        self.instrument_list = find_instruments(verbose)
+        self.instrument_list = find_instruments(verbose, logger=self.logger)
         return self.instrument_list
         
     def auto_setup_scope(self):
@@ -57,9 +68,9 @@ class SimpleScope:
                     # Placeholder for Lecroy scope support
                     # from app.scope_controller import LecroyScopeDriver
                     # return self.setup_scope(instr["addr"], LecroyScopeDriver)
-                    return False
+                    return None
         
-        return False  # No compatible scope found
+        return None  # No compatible scope found
 
 
     def setup_scope(self, address, driver=None):
@@ -80,7 +91,7 @@ class SimpleScope:
             
         try:
             self.scope_addr = address
-            self.scope = self.selected_scope_driver(self.scope_addr)
+            self.scope = self.selected_scope_driver(self.scope_addr, logger=self.logger)
             # alternativly: self.scope.address = self.scope_addr
             result = self.scope.connect()
             
@@ -97,7 +108,7 @@ class SimpleScope:
             
             return result
         except Exception as e:
-            print(f"Error setting up scope: {str(e)}")
+            self.logger.error("SimpleScope", f"Error setting up scope: {str(e)}")
             return False
 
     def disconnect(self):
@@ -216,7 +227,7 @@ class SimpleScope:
             file.write(file_data)
             file.close()
 
-        print(f"Saved: {file_path}") #logging?
+        self.logger.info("SimpleScope", f"Saved: {file_path}")
 
         return file_path
 
@@ -245,3 +256,19 @@ class SimpleScope:
             return get_filename_with_datestamp(save_dir, base_filename, suffix)
         else:
             return filename_with_suffix(base_filename, suffix)
+
+    def save_log(self, filename: str = None) -> Path:
+        """Save the current log to a file in the app data directory.
+
+        Args:
+            filename: Optional filename. Defaults to "simple_scope_log_YYYY.MM.DD_HH.MM.SS.txt"
+
+        Returns:
+            Path to the saved log file
+        """
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+            filename = f"simple_scope_log_{timestamp}.txt"
+
+        log_path = self.config._app_data_dir / filename
+        return self.logger.save(log_path, self.version)

@@ -1,7 +1,7 @@
 """
 GUI implementation for the Oscilloscope Screenshot Capture Application
 """
-
+import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -477,7 +477,8 @@ class ScopeCaptureGUI(tk.Tk):
         # Save waveform data
         self.save_waveform_var = tk.BooleanVar(value=False)
         save_waveform_check = ttk.Checkbutton(frame, text="Save waveform data",
-                                             variable=self.save_waveform_var)
+                                             variable=self.save_waveform_var,
+                                             command=self._on_save_waveform_changed)
         save_waveform_check.grid(row=2, column=0, columnspan=2, sticky='w', pady=10)
 
         # Auto increment filename
@@ -494,6 +495,12 @@ class ScopeCaptureGUI(tk.Tk):
                                                command=self._on_datestamp_changed)
         self.datestamp_check.grid(row=4, column=0, columnspan=2, sticky='w', pady=5)
 
+    def _on_save_waveform_changed(self):
+        """Handle save waveform checkbox change - show not implemented popup"""
+        if self.save_waveform_var.get():
+            self._show_not_implemented("Save waveform data")
+            self.save_waveform_var.set(False)
+
     def _on_auto_increment_changed(self):
         """Handle auto increment checkbox change - mutually exclusive with datestamp"""
         if self.auto_increment_var.get():
@@ -505,6 +512,10 @@ class ScopeCaptureGUI(tk.Tk):
         if self.datestamp_var.get():
             self.auto_increment_var.set(False)
         self.scope.config.datestamp = self.datestamp_var.get()
+
+    def _show_not_implemented(self, feature_name: str = "This feature"):
+        """Show a generic 'not implemented' popup"""
+        messagebox.showinfo("Not Implemented", f"{feature_name} is not yet implemented.")
         
     def _initialize_metadata_tab(self):
         """Initialize the Metadata tab with dynamic UI elements"""
@@ -557,11 +568,16 @@ class ScopeCaptureGUI(tk.Tk):
     def scan_for_scope(self):
         """Scan for connected oscilloscope"""
         try:
-            # First scan for all available instruments
-            self.scope.scan_for_instruments()
             
-            # Attempt to auto-connect to a supported scope
-            result = self.scope.auto_setup_scope()
+            for _ in range(5):
+                # First scan for all available instruments
+                self.scope.scan_for_instruments()
+                
+                # Attempt to auto-connect to a supported scope
+                result = self.scope.auto_setup_scope()
+                if self.scope.scope is not None:
+                    break
+                time.sleep(0.5)
             
             if result:
                 self.connection_status.config(text="Status: Connected")
@@ -609,21 +625,76 @@ class ScopeCaptureGUI(tk.Tk):
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
 
     def _initialize_help_tab(self):
-        """Initialize the Help tab"""
+        """Initialize the Help tab with log display"""
         frame = ttk.Frame(self.help_tab, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
-        ttk.Label(frame, text="Help", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 20))
+        ttk.Label(frame, text="Application Log", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 10))
 
+        # Log display frame
+        log_frame = ttk.Frame(frame)
+        log_frame.pack(fill='both', expand=True, pady=(0, 10))
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(log_frame)
+        scrollbar.pack(side='right', fill='y')
+
+        # Listbox for log entries
+        self.log_listbox = tk.Listbox(log_frame, yscrollcommand=scrollbar.set,
+                                       font=('Consolas', 9), selectmode='extended')
+        self.log_listbox.pack(side='left', fill='both', expand=True)
+        scrollbar.config(command=self.log_listbox.yview)
+
+        # Save Log button
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill='x', pady=(0, 10))
+
+        save_log_btn = ttk.Button(button_frame, text="Save Log", command=self._save_log)
+        save_log_btn.pack(side='left')
+
+        # Help text at bottom
         help_text = "For bug reports or feature requests, please check the About tab for contact information."
-        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(0, 10))
+        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(10, 0))
+
+        # Register callback to receive log updates
+        self.scope.logger.add_callback(self._on_log_entry)
+
+        # Load existing log entries
+        self._refresh_log_display()
+
+    def _on_log_entry(self, entry):
+        """Callback when a new log entry is added."""
+        # Use after() to ensure thread safety with tkinter
+        self.after(0, lambda: self._add_log_entry_to_display(entry))
+
+    def _add_log_entry_to_display(self, entry):
+        """Add a single log entry to the listbox."""
+        self.log_listbox.insert(tk.END, str(entry))
+        self.log_listbox.see(tk.END)  # Auto-scroll to bottom
+
+    def _refresh_log_display(self):
+        """Refresh the log display with all current entries."""
+        self.log_listbox.delete(0, tk.END)
+        for entry in self.scope.logger.entries:
+            self.log_listbox.insert(tk.END, str(entry))
+
+    def _save_log(self):
+        """Save the log to a file."""
+        try:
+            filepath = self.scope.save_log()
+            messagebox.showinfo("Log Saved", f"Log saved to:\n{filepath}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save log: {str(e)}")
 
     def _initialize_about_tab(self):
         """Initialize the About tab with author and project information"""
         frame = ttk.Frame(self.about_tab, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
-        ttk.Label(frame, text="About Simple Scope", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 20))
+        ttk.Label(frame, text="About Simple Scope", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 10))
+
+        # Version info
+        ttk.Label(frame, text=f"Version: {self.scope.version}").pack(anchor='w', pady=(0, 20))
 
         # Author info
         ttk.Label(frame, text="Author:", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(10, 2))

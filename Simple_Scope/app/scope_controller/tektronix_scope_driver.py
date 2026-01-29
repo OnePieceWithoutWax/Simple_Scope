@@ -2,8 +2,8 @@
 Controller for communicating with the oscilloscope via pyvisa
 """
 
-import time
-import pathlib
+# import time
+# import pathlib
 from pathlib import Path
 from .base_scope_driver import ScopeDriver
 
@@ -44,7 +44,7 @@ class TektronixScopeDriver(ScopeDriver):
                 file.write(imgData)
                 file.close()
 
-            print(f"Saved: {file_path}")
+            self._log("info", f"Saved: {file_path}")
             
             # Save waveform data if requested
             # if save_waveform:
@@ -54,7 +54,7 @@ class TektronixScopeDriver(ScopeDriver):
             return str(file_path)
             
         except Exception as e:
-            print(f"Error capturing screenshot: {str(e)}") #logging?
+            self._log("error", f"Error capturing screenshot: {str(e)}")
             raise
 
     def capture_screenshot(self, *args, **kwargs): #, save_dir=None, filename=None, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
@@ -108,7 +108,7 @@ class TektronixScopeDriver(ScopeDriver):
                     f.write(f"{time_val:.9f},{voltage:.6f}\n")
                     
         except Exception as e:
-            print(f"Error saving waveform data: {str(e)}")
+            self._log("error", f"Error saving waveform data: {str(e)}")
 
 # The commented out `capture_screenshot_AI` method in the TektronixScopeDriver class is a method
 # intended to capture a screenshot from the connected oscilloscope. It takes several parameters such

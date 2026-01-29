@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from app.version import __version__
+
 
 def _default_save_directory() -> str:
     return str(Path.home() / "Pictures" / "scope_capture")
@@ -33,6 +35,7 @@ class AppConfig:
     _config_file: Path = field(default=None, repr=False, compare=False)
     _app_data_dir: Path = field(default=None, repr=False, compare=False)
     _loading: bool = field(default=True, repr=False, compare=False)
+    _logger: "Logger" = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         """Initialize paths and load existing config"""
@@ -64,6 +67,16 @@ class AppConfig:
         if not getattr(self, '_loading', True):
             self.save_config()
 
+    def _log(self, level: str, message: str) -> None:
+        """Log a message if logger is available.
+
+        Args:
+            level: Log level ('debug', 'info', 'warning', 'error')
+            message: Message to log
+        """
+        if self._logger:
+            getattr(self._logger, level)("config", message)
+
     @property
     def formatted_file_format(self) -> str:
         """File format with dot prefix (.png, .jpg)"""
@@ -86,7 +99,7 @@ class AppConfig:
                         if hasattr(self, key) and not key.startswith('_'):
                             object.__setattr__(self, key, value)
         except Exception as e:
-            print(f"Error loading configuration: {str(e)}")
+            self._log("error", f"Error loading configuration: {str(e)}")
 
     def save_config(self) -> None:
         """Save configuration to file"""
@@ -100,11 +113,14 @@ class AppConfig:
                 if not k.startswith('_')
             }
 
+            # Always log the current application version
+            config_dict['app_version'] = __version__
+
             with open(self._config_file, 'w') as f:
                 json.dump(config_dict, f, indent=4)
 
         except Exception as e:
-            print(f"Error saving configuration: {str(e)}")
+            self._log("error", f"Error saving configuration: {str(e)}")
 
     # Methods with side effects (kept as methods)
 

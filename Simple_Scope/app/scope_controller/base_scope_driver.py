@@ -1,8 +1,8 @@
 """
 Controller for communicating with the oscilloscope via pyvisa
 """
-import time
-import pathlib
+# import time
+# import pathlib
 import pyvisa
 
 class ScopeDriver:
@@ -13,13 +13,25 @@ class ScopeDriver:
     since we didnt see the NotImplementedError, we were debugging the wrong thing
     """
     
-    def __init__(self, address=None, name=None):
+    def __init__(self, address=None, name=None, logger=None):
         self.resource_manager = None
         self.adaptor = None
         self.name = name
         self._address = None
-        
+        self.logger = logger
+
         self.address = address  # property to set the address
+
+    def _log(self, level: str, message: str) -> None:
+        """Log a message if logger is available.
+
+        Args:
+            level: Log level ('debug', 'info', 'warning', 'error')
+            message: Message to log
+        """
+        if self.logger:
+            source = self.__class__.__name__
+            getattr(self.logger, level)(source, message)
 
 
     @property
@@ -50,9 +62,10 @@ class ScopeDriver:
         try:
             self.adaptor = self.resource_manager.open_resource(self.address)
             self.adaptor.timeout = 5000  # Set timeout to 5 seconds
+            self._log("info", f"Connected to device at {self.address}")
             return True
         except Exception as e:
-            print(f"Error connecting to device: {e}")
+            self._log("error", f"Error connecting to device: {e}")
             return False
         
 
