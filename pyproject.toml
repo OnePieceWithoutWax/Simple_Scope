@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simple-scope"
+dynamic = ["version"]
+description = "Oscilloscope Screenshot Capture Application"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Niel Walker", email = "nielandrewalker@gmail.com"}
+]
+dependencies = [
+    "pyvisa>=1.11.0",
+    "pyvisa-py>=0.5.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=4.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/OnePieceWithoutWax/Simple_Scope"
+Repository = "https://github.com/OnePieceWithoutWax/Simple_Scope"
+
+[tool.setuptools]
+package-dir = {"" = "Simple_Scope"}
+
+[tool.setuptools.packages.find]
+where = ["Simple_Scope"]
+
+[tool.setuptools_scm]
+write_to = "Simple_Scope/app/_version.py"
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
