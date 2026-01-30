@@ -1,105 +1,64 @@
 """
-Lightweight logging module for Simple Scope application.
-Logs are stored in-memory and cleared on startup.
+Logging module for Simple Scope application using Python's built-in logging.
+Provides a custom ListHandler for in-memory storage and GUI display.
 """
-from dataclasses import dataclass
+import logging
 from datetime import datetime
-from typing import Callable, List, Optional
-from enum import IntEnum
+from typing import Callable, List
 from pathlib import Path
 
 
-class LogLevel(IntEnum):
-    """Log severity levels"""
-    DEBUG = 10
-    INFO = 20
-    WARNING = 30
-    ERROR = 40
+class ListHandler(logging.Handler):
+    """Custom logging handler that stores log records in a list.
 
+    Supports callbacks for live GUI updates and provides access to
+    formatted log entries.
+    """
 
-@dataclass
-class LogEntry:
-    """A single log entry"""
-    timestamp: str
-    level: str
-    source: str
-    message: str
+    def __init__(self, level: int = logging.DEBUG):
+        super().__init__(level)
+        self._records: List[logging.LogRecord] = []
+        self._callbacks: List[Callable[[logging.LogRecord], None]] = []
 
-    def __str__(self) -> str:
-        return f"[{self.timestamp}] {self.level:<7} [{self.source}] {self.message}"
-
-
-class Logger:
-    """Simple in-memory logger with callback support for GUI updates."""
-
-    def __init__(self, min_level: LogLevel = LogLevel.DEBUG):
-        self._entries: List[LogEntry] = []
-        self._min_level = min_level
-        self._callbacks: List[Callable[[LogEntry], None]] = []
+        # Set default formatter
+        self.setFormatter(logging.Formatter(
+            "[%(asctime)s] %(levelname)-7s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        ))
 
     @property
-    def entries(self) -> List[LogEntry]:
-        """Read-only access to log entries."""
-        return self._entries.copy()
+    def records(self) -> List[logging.LogRecord]:
+        """Raw log records."""
+        return self._records.copy()
 
     @property
-    def min_level(self) -> LogLevel:
-        """Current minimum log level."""
-        return self._min_level
+    def entries(self) -> List[str]:
+        """Formatted log entries as strings."""
+        return [self.format(record) for record in self._records]
 
-    @min_level.setter
-    def min_level(self, level: LogLevel):
-        """Set minimum log level."""
-        self._min_level = level
-
-    def clear(self) -> None:
-        """Clear all log entries."""
-        self._entries.clear()
-
-    def add_callback(self, callback: Callable[[LogEntry], None]) -> None:
-        """Register a callback to be notified of new log entries."""
-        self._callbacks.append(callback)
-
-    def remove_callback(self, callback: Callable[[LogEntry], None]) -> None:
-        """Remove a registered callback."""
-        if callback in self._callbacks:
-            self._callbacks.remove(callback)
-
-    def _log(self, level: LogLevel, source: str, message: str) -> None:
-        """Internal logging method."""
-        if level < self._min_level:
-            return
-
-        entry = LogEntry(
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            level=level.name,
-            source=source,
-            message=message
-        )
-        self._entries.append(entry)
+    def emit(self, record: logging.LogRecord) -> None:
+        """Handle a log record."""
+        self._records.append(record)
 
         # Notify callbacks
         for callback in self._callbacks:
             try:
-                callback(entry)
+                callback(record)
             except Exception:
                 pass  # Don't let callback errors break logging
 
-    def debug(self, source: str, message: str) -> None:
-        """Log a debug message."""
-        self._log(LogLevel.DEBUG, source, message)
+    def clear(self) -> None:
+        """Clear all stored log records."""
+        self._records.clear()
 
-    def info(self, source: str, message: str) -> None:
-        """Log an info message."""
-        self._log(LogLevel.INFO, source, message)
+    def add_callback(self, callback: Callable[[logging.LogRecord], None]) -> None:
+        """Register a callback to be notified of new log records."""
+        self._callbacks.append(callback)
 
-    def warning(self, source: str, message: str) -> None:
-        """Log a warning message."""
-        self._log(LogLevel.WARNING, source, message)
-
-    def error(self, source: str, message: str) -> None:
-        """Log an error message."""
-        self._log(LogLevel.ERROR, source, message)
+    def remove_callback(self, callback: Callable[[logging.LogRecord], None]) -> None:
+        """Remove a registered callback."""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
 
     def save(self, filepath: Path, app_version: str = "unknown") -> Path:
         """Save log entries to a text file.
@@ -119,7 +78,31 @@ class Logger:
             f.write(f"Application Version: {app_version}\n")
             f.write("=" * 60 + "\n\n")
 
-            for entry in self._entries:
-                f.write(str(entry) + "\n")
+            for entry in self.entries:
+                f.write(entry + "\n")
 
         return filepath
+
+
+def setup_logger(name: str = "SimpleScope", level: int = logging.DEBUG) -> tuple[logging.Logger, ListHandler]:
+    """Create and configure a logger with ListHandler.
+
+    Args:
+        name: Logger name
+        level: Minimum log level
+
+    Returns:
+        Tuple of (logger, handler) for accessing both
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Prevent duplicate handlers if called multiple times
+    for handler in logger.handlers[:]:
+        if isinstance(handler, ListHandler):
+            logger.removeHandler(handler)
+
+    handler = ListHandler(level)
+    logger.addHandler(handler)
+
+    return logger, handler

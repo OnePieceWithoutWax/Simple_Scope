@@ -30,8 +30,7 @@ class ScopeDriver:
             message: Message to log
         """
         if self.logger:
-            source = self.__class__.__name__
-            getattr(self.logger, level)(source, message)
+            getattr(self.logger, level)(message)
 
 
     @property

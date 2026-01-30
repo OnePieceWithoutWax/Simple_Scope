@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from app.config import AppConfig
 from app.version import __version__
-from app.logger import Logger
+from app.logger import setup_logger
 from .pyvisa_utils import find_instruments
 from app.utils import get_next_incremented_filename, get_filename_with_datestamp, filename_with_suffix
 
@@ -17,7 +17,7 @@ class SimpleScope:
     """
     
     def __init__(self):
-        self.logger = Logger()
+        self.logger, self.log_handler = setup_logger("SimpleScope")
         self.scope = None
         self.scope_addr = None
         self.instrument_list = []
@@ -33,7 +33,7 @@ class SimpleScope:
                             )
         self.selected_scope_driver = None
         self.device_id = None
-        self.logger.info("SimpleScope", "Application initialized")
+        self.logger.info("Application initialized")
 
     @property
     def version(self) -> str:
@@ -108,7 +108,7 @@ class SimpleScope:
             
             return result
         except Exception as e:
-            self.logger.error("SimpleScope", f"Error setting up scope: {str(e)}")
+            self.logger.error(f"Error setting up scope: {str(e)}")
             return False
 
     def disconnect(self):
@@ -227,7 +227,7 @@ class SimpleScope:
             file.write(file_data)
             file.close()
 
-        self.logger.info("SimpleScope", f"Saved: {file_path}")
+        self.logger.info(f"Saved: {file_path}")
 
         return file_path
 
@@ -271,4 +271,4 @@ class SimpleScope:
             filename = f"simple_scope_log_{timestamp}.txt"
 
         log_path = self.config._app_data_dir / filename
-        return self.logger.save(log_path, self.version)
+        return self.log_handler.save(log_path, self.version)

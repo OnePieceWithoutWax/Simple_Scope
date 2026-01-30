@@ -657,26 +657,27 @@ class ScopeCaptureGUI(tk.Tk):
         ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(10, 0))
 
         # Register callback to receive log updates
-        self.scope.logger.add_callback(self._on_log_entry)
+        self.scope.log_handler.add_callback(self._on_log_entry)
 
         # Load existing log entries
         self._refresh_log_display()
 
-    def _on_log_entry(self, entry):
-        """Callback when a new log entry is added."""
+    def _on_log_entry(self, record):
+        """Callback when a new log record is added."""
         # Use after() to ensure thread safety with tkinter
-        self.after(0, lambda: self._add_log_entry_to_display(entry))
+        formatted = self.scope.log_handler.format(record)
+        self.after(0, lambda: self._add_log_entry_to_display(formatted))
 
     def _add_log_entry_to_display(self, entry):
         """Add a single log entry to the listbox."""
-        self.log_listbox.insert(tk.END, str(entry))
+        self.log_listbox.insert(tk.END, entry)
         self.log_listbox.see(tk.END)  # Auto-scroll to bottom
 
     def _refresh_log_display(self):
         """Refresh the log display with all current entries."""
         self.log_listbox.delete(0, tk.END)
-        for entry in self.scope.logger.entries:
-            self.log_listbox.insert(tk.END, str(entry))
+        for entry in self.scope.log_handler.entries:
+            self.log_listbox.insert(tk.END, entry)
 
     def _save_log(self):
         """Save the log to a file."""

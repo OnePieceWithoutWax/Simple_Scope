@@ -73,7 +73,7 @@ def find_instruments(verbose: bool = False, logger=None) -> List[Dict[str, Any]]
         """Log message if verbose and logger available, otherwise print."""
         if verbose:
             if logger:
-                getattr(logger, level)("pyvisa_utils", message)
+                getattr(logger, level)(message)
             else:
                 print(message)
     rm = pyvisa.ResourceManager()

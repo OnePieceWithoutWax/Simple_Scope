@@ -35,7 +35,7 @@ class AppConfig:
     _config_file: Path = field(default=None, repr=False, compare=False)
     _app_data_dir: Path = field(default=None, repr=False, compare=False)
     _loading: bool = field(default=True, repr=False, compare=False)
-    _logger: "Logger" = field(default=None, repr=False, compare=False)
+    _logger = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         """Initialize paths and load existing config"""
@@ -75,7 +75,7 @@ class AppConfig:
             message: Message to log
         """
         if self._logger:
-            getattr(self._logger, level)("config", message)
+            getattr(self._logger, level)(message)
 
     @property
     def formatted_file_format(self) -> str:
