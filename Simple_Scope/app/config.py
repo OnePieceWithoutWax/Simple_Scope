@@ -4,6 +4,7 @@ Configuration management for the application
 
 from dataclasses import dataclass, field, asdict
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -35,7 +36,7 @@ class AppConfig:
     _config_file: Path = field(default=None, repr=False, compare=False)
     _app_data_dir: Path = field(default=None, repr=False, compare=False)
     _loading: bool = field(default=True, repr=False, compare=False)
-    _logger = field(default=None, repr=False, compare=False)
+    _logger: logging.Logger = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         """Initialize paths and load existing config"""
