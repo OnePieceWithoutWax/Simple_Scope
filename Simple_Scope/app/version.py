@@ -7,25 +7,48 @@ Retrieves version from:
 3. Fallback to "unknown"
 """
 
+import logging
 from pathlib import Path
+
+# Use SimpleScope namespace to integrate with app's logging hierarchy
+logger = logging.getLogger("SimpleScope.version")
+
+# Store version resolution details for later logging
+_version_source: str = "unknown"
+_version_details: list[str] = []
 
 
 def _get_version_from_scm_file() -> str | None:
     """Try to get version from setuptools-scm generated file."""
     try:
         from . import _version
+        _version_details.append(f"Found version from setuptools-scm: {_version.version}")
         return _version.version
-    except ImportError:
+    except ImportError as e:
+        _version_details.append(f"setuptools-scm _version.py not found: {e}")
         return None
 
 
 def _get_version_from_git() -> str | None:
     """Try to get version from git tags at runtime."""
-    import subprocess # since this is more for development, lets not load it in the build
+    import subprocess  # since this is more for development, lets not load it in the build
     try:
-        # Find the git root directory
-        module_dir = Path(__file__).parent
-        git_dir = module_dir.parent.parent.parent  # Navigate up to git root
+        # Find the git root directory by walking up from cwd
+        git_dir = Path.cwd().resolve()
+        _version_details.append(f"Starting git search from: {git_dir}")
+
+        while True:
+            if (git_dir / ".git").exists():
+                _version_details.append(f"Found .git directory at: {git_dir}")
+                break
+            parent = git_dir.parent
+            if parent == git_dir:
+                # Reached filesystem root without finding .git
+                _version_details.append("Reached filesystem root without finding .git")
+                return None
+            git_dir = parent
+
+        _version_details.append(f"Using git repo at: {git_dir}")
 
         result = subprocess.run(
             ["git", "describe", "--tags", "--always"],
@@ -35,14 +58,23 @@ def _get_version_from_git() -> str | None:
             timeout=5,
         )
 
+        _version_details.append(f"git describe returncode: {result.returncode}")
+        if result.stdout:
+            _version_details.append(f"git describe stdout: {result.stdout.strip()}")
+        if result.stderr:
+            _version_details.append(f"git describe stderr: {result.stderr.strip()}")
+
         if result.returncode == 0:
             version = result.stdout.strip()
             # Remove 'v' prefix if present (e.g., v1.0.0 -> 1.0.0)
             if version.startswith('v'):
                 version = version[1:]
+            _version_details.append(f"Found version from git: {version}")
             return version
+        _version_details.append("git describe failed (non-zero return code)")
         return None
-    except (subprocess.SubprocessError, OSError, FileNotFoundError):
+    except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+        _version_details.append(f"git describe exception: {e}")
         return None
 
 
@@ -52,18 +84,40 @@ def get_version() -> str:
     Returns:
         Version string from git tag, setuptools-scm, or "unknown" as fallback.
     """
+    global _version_source
+
     # Try setuptools-scm generated file first (for installed packages)
     version = _get_version_from_scm_file()
     if version:
+        _version_source = "setuptools-scm"
         return version
 
     # Try git describe (for development/source runs)
     version = _get_version_from_git()
     if version:
+        _version_source = "git"
         return version
 
     # Fallback
+    _version_source = "fallback"
+    _version_details.append("Could not determine version, falling back to 'unknown'")
     return "unknown"
+
+
+def log_version_info() -> None:
+    """Log version resolution details.
+
+    Call this after the logger is configured to see how the version was resolved.
+    Useful for debugging version detection issues in development.
+    """
+    logger.debug(f"Version resolution source: {_version_source}")
+    for detail in _version_details:
+        logger.debug(f"  {detail}")
+
+    if _version_source == "fallback":
+        logger.warning(f"Version is '{__version__}' (could not determine from git or setuptools-scm)")
+    else:
+        logger.info(f"Version resolved from {_version_source}: {__version__}")
 
 
 __version__ = get_version()
