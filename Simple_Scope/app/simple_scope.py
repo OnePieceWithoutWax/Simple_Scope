@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from app.config import AppConfig
-from app.version import __version__
+from app.version import __version__, log_version_info
 from app.logger import setup_logger
 from .pyvisa_utils import find_instruments
 from app.utils import get_next_incremented_filename, get_filename_with_datestamp, filename_with_suffix
@@ -18,12 +18,16 @@ class SimpleScope:
     
     def __init__(self):
         self.logger, self.log_handler = setup_logger("SimpleScope")
+        self.logger.info("SimpleScope initializing...")
+        log_version_info()  # Log version resolution details now that logger is configured
         self.scope = None
         self.scope_addr = None
         self.instrument_list = []
         self.meta = {}
+        self.logger.debug("Loading configuration...")
         self.config = AppConfig()
         self.config._logger = self.logger  # Connect logger to config
+        self.logger.debug(f"Config loaded - save_directory: {self.config.save_directory}")
         self.recent = dict(save_dir = None,
                             filename = None,
                             suffix = None,
@@ -42,60 +46,73 @@ class SimpleScope:
 
     def scan_for_instruments(self, verbose=False):
         """Scan for connected instruments
-        
+
         Args:
             verbose (bool): Whether to print detailed information
-            
+
         Returns:
             list: List of dictionaries with instrument info
         """
+        self.logger.info("Scanning for instruments...")
         self.instrument_list = find_instruments(verbose, logger=self.logger)
+        self.logger.info(f"Found {len(self.instrument_list)} instrument(s)")
+        for instr in self.instrument_list:
+            self.logger.debug(f"  - {instr.get('manufacturer', 'Unknown')} {instr.get('model_num', 'Unknown')} at {instr.get('addr', 'Unknown')}")
         return self.instrument_list
         
     def auto_setup_scope(self):
         """Setup scope based on the instrument list"""
+        self.logger.debug("Auto-detecting compatible scope...")
         for instr in self.instrument_list:
             manufacturer = instr.get("manufacturer", "")
             model_num = instr.get("model_num", "")
-            
+
             # Check for supported scope models
             if manufacturer and model_num:
                 if "TEKTRONIX" in manufacturer and "MSO5" in model_num:
+                    self.logger.info(f"Found compatible Tektronix scope: {model_num}")
                     from app.scope_controller import TektronixScopeDriver
                     self.device_id = instr
                     return self.setup_scope(instr["addr"], TektronixScopeDriver)
                 elif "LECROY" in manufacturer.upper() and "WAVESURFER" in model_num.upper():
+                    self.logger.debug(f"Found Lecroy scope (not yet supported): {model_num}")
                     # Placeholder for Lecroy scope support
                     # from app.scope_controller import LecroyScopeDriver
                     # return self.setup_scope(instr["addr"], LecroyScopeDriver)
                     return None
-        
+
+        self.logger.warning("No compatible scope found in instrument list")
         return None  # No compatible scope found
 
 
     def setup_scope(self, address, driver=None):
         """Setup connection to a scope
-        
+
         Args:
             address (str): VISA address string
             driver (class, optional): Scope driver class
-            
+
         Returns:
             bool: True if connection successful, False otherwise
         """
+        self.logger.debug(f"Setting up scope at address: {address}")
         if driver is not None:
             self.selected_scope_driver = driver
-            
+            self.logger.debug(f"Using driver: {driver.__name__}")
+
         if self.selected_scope_driver is None:
+            self.logger.error("No scope driver specified")
             return False
-            
+
         try:
             self.scope_addr = address
             self.scope = self.selected_scope_driver(self.scope_addr, logger=self.logger)
             # alternativly: self.scope.address = self.scope_addr
+            self.logger.debug("Connecting to scope...")
             result = self.scope.connect()
-            
+
             if result:
+                self.logger.info(f"Successfully connected to scope at {address}")
                 # Save the device ID for metadata
                 self.device_id = f"{self.scope_addr}"
                 for instr in self.instrument_list:
@@ -105,19 +122,25 @@ class SimpleScope:
                         if model and serial:
                             self.device_id = f"{model} (SN: {serial})"
                         break
-            
+                self.logger.debug(f"Device ID: {self.device_id}")
+            else:
+                self.logger.warning(f"Failed to connect to scope at {address}")
+
             return result
         except Exception as e:
-            self.logger.error(f"Error setting up scope: {str(e)}")
+            self.logger.error(f"Error setting up scope: {str(e)}", exc_info=True)
             return False
 
     def disconnect(self):
         """Disconnect from the scope"""
         if self.scope:
+            self.logger.info("Disconnecting from scope...")
             self.scope.disconnect()
             self.scope = None
             self.scope_addr = None
+            self.logger.debug("Disconnected successfully")
             return True
+        self.logger.debug("Disconnect called but no scope was connected")
         return False
 
     def is_connected(self):
@@ -141,48 +164,60 @@ class SimpleScope:
     def capture(self, save_dir=None, filename=None, suffix=None, bg_color="white", save_waveform=False, metadata=None):
         """
         Capture a screenshot from the connected oscilloscope
-        
+
         Args:
             save_dir (str or Path, optional): Directory to save the screenshot. Defaults to config.
             filename (str, optional): Filename for the screenshot. Defaults to config.
             bg_color (str): Background color ("white" or "black")
             save_waveform (bool): Whether to save waveform data
             metadata (dict): Optional metadata to save
-            
+
         Returns:
             str: Path to the saved file
         """
+        self.logger.info("Starting capture...")
         if not self.scope:
+            self.logger.error("Capture failed: No oscilloscope connected")
             raise ValueError("No oscilloscope connected")
-        
+
         # Use config values if not specified
         if save_dir is None:
             save_dir = self.config.get_save_directory()
-            
+
         if filename is None:
             filename = self.config.default_filename
 
         if suffix is None:
             suffix = self.config.formatted_file_format
 
+        self.logger.debug(f"Capture params - dir: {save_dir}, filename: {filename}, suffix: {suffix}, bg: {bg_color}")
+
         # Ensure directory exists
         save_path = Path(save_dir)
         save_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Capture screenshot
-        screenshot_data = self.scope.capture_screenshot(bg_color, save_waveform)
+        self.logger.debug("Requesting screenshot from scope...")
+        try:
+            screenshot_data = self.scope.capture_screenshot(bg_color, save_waveform)
+            self.logger.debug(f"Received {len(screenshot_data)} bytes of image data")
+        except Exception as e:
+            self.logger.error(f"Failed to capture screenshot: {str(e)}", exc_info=True)
+            raise
+
         self.save_file(save_dir, filename, suffix, screenshot_data)  # Save the image data to disk
         # Save metadata if provided
         if metadata:
+            self.logger.debug(f"Saving metadata: {list(metadata.keys())}")
             self.meta = metadata
             self._save_metadata(save_dir, filename)
-            
+
             # Update config with the metadata
             self.config.last_used_metadata = metadata
-        
+
         # Update the config with the new directory
         self.config.set_save_directory(save_dir)
-        
+
         # Update the recent dict with the new directory
         self.recent = dict(save_dir = save_dir,
                             filename = filename,
@@ -192,6 +227,12 @@ class SimpleScope:
                             wave_data = None,
                             metadata = metadata,
                             )
+
+        # Auto-copy to clipboard if enabled
+        if self.config.auto_copy_to_clipboard:
+            self.copy_to_clipboard(screenshot_data)
+
+        self.logger.info("Capture completed successfully")
         return screenshot_data
 
     def _save_metadata(self, save_dir, filename):
@@ -272,3 +313,46 @@ class SimpleScope:
 
         log_path = self.config._app_data_dir / filename
         return self.log_handler.save(log_path, self.version)
+
+    def copy_to_clipboard(self, image_data: bytes = None) -> bool:
+        """Copy image data to the Windows clipboard.
+
+        Args:
+            image_data: PNG image bytes. If None, uses self.recent['screenshot_data']
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if image_data is None:
+            image_data = self.recent.get('screenshot_data')
+
+        if not image_data:
+            self.logger.warning("No image data available for clipboard")
+            return False
+
+        try:
+            from PIL import Image
+            import io
+            import win32clipboard
+            import win32con
+
+            # Convert PNG bytes to BMP for Windows clipboard
+            image = Image.open(io.BytesIO(image_data))
+            output = io.BytesIO()
+            image.convert('RGB').save(output, 'BMP')
+            bmp_data = output.getvalue()[14:]  # Remove BMP file header
+
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32con.CF_DIB, bmp_data)
+            win32clipboard.CloseClipboard()
+
+            self.logger.info("Image copied to clipboard")
+            return True
+
+        except ImportError as e:
+            self.logger.error(f"Missing dependency for clipboard: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to copy to clipboard: {e}")
+            return False
