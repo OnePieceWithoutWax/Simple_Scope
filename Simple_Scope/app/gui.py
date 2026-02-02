@@ -36,6 +36,11 @@ class ScopeCaptureGUI(tk.Tk):
         # Layout mode variable
         self.layout_mode_var = tk.StringVar(value="Basic")
 
+        # Image display variables
+        self.captured_image_label = None
+        self.photo_image = None
+        self.image_display_frame = None
+
         self.notebook.add(self.capture_tab, text="Capture")
         self.notebook.add(self.config_tab, text="Config")
         self.notebook.add(self.scope_tab, text="Scope")
@@ -50,7 +55,10 @@ class ScopeCaptureGUI(tk.Tk):
         self._initialize_help_tab()
         self._initialize_about_tab()
         # self._initialize_metadata_tab()
-        
+
+        # Update window size based on display image config
+        self._update_window_size()
+
         # Auto-scan for scope on startup
         self.after(500, self.scan_for_scope)
     
@@ -161,9 +169,21 @@ class ScopeCaptureGUI(tk.Tk):
         filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
         filename_entry.grid(row=2, column=1, sticky='ew', pady=5, padx=(5, 0))
 
-        # Capture button
-        capture_button = ttk.Button(frame, text="Capture", command=self.capture_screenshot)
-        capture_button.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
+        # Button frame for Capture and Copy buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
+
+        capture_button = ttk.Button(button_frame, text="Capture", command=self.capture_screenshot)
+        capture_button.pack(side='left', padx=(0, 10))
+
+        copy_clipboard_btn = ttk.Button(button_frame, text="Copy to Clipboard",
+                                        command=self._copy_recent_to_clipboard)
+        copy_clipboard_btn.pack(side='left')
+
+        # Image display area (conditionally shown based on config)
+        display_mode = self.scope.config.display_captured_image
+        if display_mode != "Disabled":
+            self._create_image_display_area(frame, display_mode)
 
     def _draw_engineering_layout(self):
         """Draw the Engineering layout for capture tab with labeled subdirectory rows"""
@@ -208,9 +228,21 @@ class ScopeCaptureGUI(tk.Tk):
         filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
         filename_entry.grid(row=6, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
 
-        # Capture button
-        capture_button = ttk.Button(frame, text="Capture", command=self._capture_engineering)
-        capture_button.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+        # Button frame for Capture and Copy buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+
+        capture_button = ttk.Button(button_frame, text="Capture", command=self._capture_engineering)
+        capture_button.pack(side='left', padx=(0, 10))
+
+        copy_clipboard_btn = ttk.Button(button_frame, text="Copy to Clipboard",
+                                        command=self._copy_recent_to_clipboard)
+        copy_clipboard_btn.pack(side='left')
+
+        # Image display area (conditionally shown based on config)
+        display_mode = self.scope.config.display_captured_image
+        if display_mode != "Disabled":
+            self._create_image_display_area(frame, display_mode)
 
     def _add_labeled_subdir_row(self, label, default_value=""):
         """Add a labeled subdirectory row with a default value"""
@@ -264,13 +296,16 @@ class ScopeCaptureGUI(tk.Tk):
             # Get filename using SimpleScope API (handles auto_increment/datestamp)
             filename_ = self.scope.get_capture_filename(str(save_dir), base_filename, suffix)
 
-            self.scope.capture(save_dir=str(save_dir),
+            screenshot_data = self.scope.capture(save_dir=str(save_dir),
                                filename=Path(filename_).stem,
                                suffix=suffix,
                                bg_color=self.bg_color_var.get(),
                                save_waveform=self.save_waveform_var.get(),
                                metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
                                )
+
+            # Display captured image if enabled
+            self._display_captured_image(screenshot_data)
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
@@ -322,9 +357,21 @@ class ScopeCaptureGUI(tk.Tk):
         filename_entry = ttk.Entry(frame, textvariable=self.filename_var, width=40)
         filename_entry.grid(row=6, column=1, columnspan=3, sticky='ew', pady=5, padx=(5, 0))
 
-        # Capture button
-        capture_button = ttk.Button(frame, text="Capture", command=self._capture_advanced)
-        capture_button.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+        # Button frame for Capture and Copy buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=7, column=0, columnspan=4, sticky='w', pady=10)
+
+        capture_button = ttk.Button(button_frame, text="Capture", command=self._capture_advanced)
+        capture_button.pack(side='left', padx=(0, 10))
+
+        copy_clipboard_btn = ttk.Button(button_frame, text="Copy to Clipboard",
+                                        command=self._copy_recent_to_clipboard)
+        copy_clipboard_btn.pack(side='left')
+
+        # Image display area (conditionally shown based on config)
+        display_mode = self.scope.config.display_captured_image
+        if display_mode != "Disabled":
+            self._create_image_display_area(frame, display_mode)
 
     def _add_subdirectory_row(self, default_value=""):
         """Add a new subdirectory row with text boxes"""
@@ -442,13 +489,16 @@ class ScopeCaptureGUI(tk.Tk):
             # Get filename using SimpleScope API (handles auto_increment/datestamp)
             filename_ = self.scope.get_capture_filename(str(save_dir), base_filename, suffix)
 
-            self.scope.capture(save_dir=str(save_dir),
+            screenshot_data = self.scope.capture(save_dir=str(save_dir),
                                filename=Path(filename_).stem,
                                suffix=suffix,
                                bg_color=self.bg_color_var.get(),
                                save_waveform=self.save_waveform_var.get(),
                                metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
                                )
+
+            # Display captured image if enabled
+            self._display_captured_image(screenshot_data)
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
@@ -495,6 +545,22 @@ class ScopeCaptureGUI(tk.Tk):
                                                command=self._on_datestamp_changed)
         self.datestamp_check.grid(row=4, column=0, columnspan=2, sticky='w', pady=5)
 
+        # Display Captured Image
+        ttk.Label(frame, text="Display Captured Image:").grid(row=5, column=0, sticky='w', pady=5)
+        self.display_image_var = tk.StringVar(value=self.scope.config.display_captured_image)
+        display_image_combo = ttk.Combobox(frame, textvariable=self.display_image_var,
+                                           values=["Disabled", "Display To The Right", "Display Below"],
+                                           state="readonly", width=20)
+        display_image_combo.grid(row=5, column=1, sticky='w', pady=5, padx=(5, 0))
+        display_image_combo.bind('<<ComboboxSelected>>', self._on_display_image_changed)
+
+        # Auto copy to clipboard
+        self.auto_copy_var = tk.BooleanVar(value=self.scope.config.auto_copy_to_clipboard)
+        auto_copy_check = ttk.Checkbutton(frame, text="Auto copy to clipboard after capture",
+                                          variable=self.auto_copy_var,
+                                          command=self._on_auto_copy_changed)
+        auto_copy_check.grid(row=6, column=0, columnspan=2, sticky='w', pady=5)
+
     def _on_save_waveform_changed(self):
         """Handle save waveform checkbox change - show not implemented popup"""
         if self.save_waveform_var.get():
@@ -513,10 +579,88 @@ class ScopeCaptureGUI(tk.Tk):
             self.auto_increment_var.set(False)
         self.scope.config.datestamp = self.datestamp_var.get()
 
+    def _on_display_image_changed(self, event=None):
+        """Handle display image mode change"""
+        self.scope.config.display_captured_image = self.display_image_var.get()
+        self._update_window_size()
+        self._redraw_capture_content()
+
+    def _on_auto_copy_changed(self):
+        """Handle auto copy checkbox change"""
+        self.scope.config.auto_copy_to_clipboard = self.auto_copy_var.get()
+
     def _show_not_implemented(self, feature_name: str = "This feature"):
         """Show a generic 'not implemented' popup"""
         messagebox.showinfo("Not Implemented", f"{feature_name} is not yet implemented.")
-        
+
+    def _update_window_size(self):
+        """Update window size based on display image setting"""
+        display_mode = self.scope.config.display_captured_image
+        if display_mode == "Disabled":
+            new_geometry = "600x400"
+        elif display_mode == "Display To The Right":
+            new_geometry = "1050x400"
+        else:  # Display Below
+            new_geometry = "600x650"
+        self.geometry(new_geometry)
+        self.update_idletasks()
+
+    def _create_image_display_area(self, parent_frame, display_mode):
+        """Create the image display area based on display mode"""
+        self.image_display_frame = ttk.LabelFrame(parent_frame, text="Captured Image")
+
+        if display_mode == "Display To The Right":
+            self.image_display_frame.grid(row=0, column=10, rowspan=10, sticky='nsew', padx=10, pady=5)
+        else:  # Display Below
+            self.image_display_frame.grid(row=100, column=0, columnspan=10, sticky='nsew', padx=5, pady=10)
+
+        # Image label (placeholder initially)
+        self.captured_image_label = ttk.Label(self.image_display_frame, text="No image captured")
+        self.captured_image_label.pack(padx=10, pady=10)
+
+    def _display_captured_image(self, image_data: bytes):
+        """Display the captured image in the GUI"""
+        if not hasattr(self, 'captured_image_label') or self.captured_image_label is None:
+            return
+        if self.scope.config.display_captured_image == "Disabled":
+            return
+
+        try:
+            from PIL import Image, ImageTk
+            import io
+
+            # Open image from bytes
+            image = Image.open(io.BytesIO(image_data))
+
+            # Resize to fit display area
+            display_mode = self.scope.config.display_captured_image
+            if display_mode == "Display To The Right":
+                max_size = (400, 300)
+            else:
+                max_size = (550, 200)
+
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+            # Keep reference to prevent garbage collection
+            self.photo_image = ImageTk.PhotoImage(image)
+
+            # Update label
+            self.captured_image_label.configure(image=self.photo_image, text="")
+
+        except ImportError as e:
+            self.scope.logger.error(f"Missing PIL for image display: {e}")
+            self.captured_image_label.configure(text="PIL not installed")
+        except Exception as e:
+            self.scope.logger.error(f"Failed to display image: {e}")
+            self.captured_image_label.configure(text="Error displaying image")
+
+    def _copy_recent_to_clipboard(self):
+        """Copy the most recent captured image to clipboard"""
+        if self.scope.copy_to_clipboard():
+            messagebox.showinfo("Success", "Image copied to clipboard")
+        else:
+            messagebox.showwarning("Warning", "No image available or clipboard operation failed")
+
     def _initialize_metadata_tab(self):
         """Initialize the Metadata tab with dynamic UI elements"""
         frame = ttk.Frame(self.metadata_tab, padding=(20, 10))
@@ -613,7 +757,7 @@ class ScopeCaptureGUI(tk.Tk):
             # Get filename using SimpleScope API (handles auto_increment/datestamp)
             filename_ = self.scope.get_capture_filename(save_dir, base_filename, suffix)
 
-            self.scope.capture(save_dir=save_dir,
+            screenshot_data = self.scope.capture(save_dir=save_dir,
                                filename=Path(filename_).stem,
                                suffix=suffix,
                                bg_color=self.bg_color_var.get(),
@@ -621,46 +765,65 @@ class ScopeCaptureGUI(tk.Tk):
                                metadata={key: var.get() for key, (_, var) in self.metadata_fields.items()}
                                )
 
+            # Display captured image if enabled
+            self._display_captured_image(screenshot_data)
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
 
     def _initialize_help_tab(self):
-        """Initialize the Help tab with log display"""
+        """Initialize the Help tab with toggleable log display"""
         frame = ttk.Frame(self.help_tab, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
-        ttk.Label(frame, text="Application Log", font=('TkDefaultFont', 14, 'bold')).pack(anchor='w', pady=(0, 10))
+        # Help text at top
+        help_text = "For bug reports or feature requests, please check the About tab for contact information."
+        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(0, 10))
 
-        # Log display frame
-        log_frame = ttk.Frame(frame)
-        log_frame.pack(fill='both', expand=True, pady=(0, 10))
+        # Controls row: Save Log button and Show Application Log checkbox
+        controls_frame = ttk.Frame(frame)
+        controls_frame.pack(fill='x', pady=(0, 10))
 
-        # Scrollbar
+        save_log_btn = ttk.Button(controls_frame, text="Save Log", command=self._save_log)
+        save_log_btn.pack(side='left', padx=(0, 20))
+
+        self.show_log_var = tk.BooleanVar(value=False)
+        show_log_check = ttk.Checkbutton(controls_frame, text="Show Application Log",
+                                          variable=self.show_log_var,
+                                          command=self._toggle_log_display)
+        show_log_check.pack(side='left')
+
+        # Log display container (initially hidden, displayed below controls when shown)
+        self.log_container = ttk.Frame(frame)
+        # Don't pack initially - will be shown when toggled
+
+        ttk.Label(self.log_container, text="Application Log", font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(0, 5))
+
+        # Log display frame with scrollbar
+        log_frame = ttk.Frame(self.log_container)
+        log_frame.pack(fill='both', expand=True)
+
         scrollbar = ttk.Scrollbar(log_frame)
         scrollbar.pack(side='right', fill='y')
 
-        # Listbox for log entries
         self.log_listbox = tk.Listbox(log_frame, yscrollcommand=scrollbar.set,
-                                       font=('Consolas', 9), selectmode='extended')
+                                       font=('Consolas', 9), selectmode='extended',
+                                       height=12)
         self.log_listbox.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=self.log_listbox.yview)
-
-        # Save Log button
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill='x', pady=(0, 10))
-
-        save_log_btn = ttk.Button(button_frame, text="Save Log", command=self._save_log)
-        save_log_btn.pack(side='left')
-
-        # Help text at bottom
-        help_text = "For bug reports or feature requests, please check the About tab for contact information."
-        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(10, 0))
 
         # Register callback to receive log updates
         self.scope.log_handler.add_callback(self._on_log_entry)
 
         # Load existing log entries
         self._refresh_log_display()
+
+    def _toggle_log_display(self):
+        """Toggle the visibility of the application log"""
+        if self.show_log_var.get():
+            self.log_container.pack(fill='both', expand=True)
+        else:
+            self.log_container.pack_forget()
 
     def _on_log_entry(self, record):
         """Callback when a new log record is added."""
