@@ -66,18 +66,35 @@ class ScopeCaptureGUI(tk.Tk):
         """Initialize the Scope tab with connection controls"""
         frame = ttk.Frame(self.scope_tab, padding=(20, 10))
         frame.pack(fill='both', expand=True)
-        
+
         # Connection status
         self.connection_status = ttk.Label(frame, text="Status: Not Connected")
-        self.connection_status.pack(anchor='w', pady=(0, 20))
-        
+        self.connection_status.pack(anchor='w', pady=(0, 10))
+
+        # Separator
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=15)
+
+        # Discovered instruments section
+        ttk.Label(frame, text="Discovered Instruments:", font=('TkDefaultFont', 9, 'bold')).pack(anchor='w', pady=(0, 5))
+
+        # Dropdown for instrument selection
+        self.instrument_var = tk.StringVar()
+        self.instrument_dropdown = ttk.Combobox(frame, textvariable=self.instrument_var,
+                                                 state="readonly", width=60)
+        self.instrument_dropdown.pack(anchor='w', pady=(0, 10))
+        self.instrument_dropdown.bind('<<ComboboxSelected>>', self._on_instrument_selected)
+        self._instrument_map = {}  # Maps display string to instrument info
+
         # Scan button
         scan_button = ttk.Button(frame, text="Scan for Scope", command=self.scan_for_scope)
         scan_button.pack(anchor='w')
-        
-        # Device info
+
+        # Device info (currently connected) - initialized from config's last_connected_scope
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=15)
+        ttk.Label(frame, text="Currently Connected:", font=('TkDefaultFont', 9, 'bold')).pack(anchor='w', pady=(0, 2))
         self.device_info = ttk.Label(frame, text="No device detected")
-        self.device_info.pack(anchor='w', pady=(20, 0))
+        self.device_info.pack(anchor='w', padx=(20, 0))
+        self._update_device_info_from_config()
     
     def _initialize_capture_tab(self):
         """Initialize the Capture tab with layout selector and capture controls"""
@@ -554,12 +571,21 @@ class ScopeCaptureGUI(tk.Tk):
         display_image_combo.grid(row=5, column=1, sticky='w', pady=5, padx=(5, 0))
         display_image_combo.bind('<<ComboboxSelected>>', self._on_display_image_changed)
 
+        # Display Image Size
+        ttk.Label(frame, text="Display Image Size:").grid(row=6, column=0, sticky='w', pady=5)
+        self.display_image_size_var = tk.StringVar(value=self.scope.config.display_image_size)
+        display_size_combo = ttk.Combobox(frame, textvariable=self.display_image_size_var,
+                                          values=["Small", "Medium", "Large"],
+                                          state="readonly", width=10)
+        display_size_combo.grid(row=6, column=1, sticky='w', pady=5, padx=(5, 0))
+        display_size_combo.bind('<<ComboboxSelected>>', self._on_display_image_size_changed)
+
         # Auto copy to clipboard
         self.auto_copy_var = tk.BooleanVar(value=self.scope.config.auto_copy_to_clipboard)
         auto_copy_check = ttk.Checkbutton(frame, text="Auto copy to clipboard after capture",
                                           variable=self.auto_copy_var,
                                           command=self._on_auto_copy_changed)
-        auto_copy_check.grid(row=6, column=0, columnspan=2, sticky='w', pady=5)
+        auto_copy_check.grid(row=7, column=0, columnspan=2, sticky='w', pady=5)
 
     def _on_save_waveform_changed(self):
         """Handle save waveform checkbox change - show not implemented popup"""
@@ -584,6 +610,10 @@ class ScopeCaptureGUI(tk.Tk):
         self.scope.config.display_captured_image = self.display_image_var.get()
         self._update_window_size()
         self._redraw_capture_content()
+
+    def _on_display_image_size_changed(self, event=None):
+        """Handle display image size change"""
+        self.scope.config.display_image_size = self.display_image_size_var.get()
 
     def _on_auto_copy_changed(self):
         """Handle auto copy checkbox change"""
@@ -632,12 +662,10 @@ class ScopeCaptureGUI(tk.Tk):
             # Open image from bytes
             image = Image.open(io.BytesIO(image_data))
 
-            # Resize to fit display area
-            display_mode = self.scope.config.display_captured_image
-            if display_mode == "Display To The Right":
-                max_size = (400, 300)
-            else:
-                max_size = (550, 200)
+            # Resize to fit display area based on config setting
+            size_map = {"Small": 512, "Medium": 800, "Large": 1024}
+            size = size_map.get(self.scope.config.display_image_size, 800)
+            max_size = (size, size)
 
             image.thumbnail(max_size, Image.Resampling.LANCZOS)
 
@@ -709,24 +737,83 @@ class ScopeCaptureGUI(tk.Tk):
         for key, value in metadata_dict.items():
             self.add_metadata_field(key, value)
     
+    def _update_device_info_from_config(self):
+        """Update device info display from config's last_connected_scope"""
+        last_scope = self.scope.config.last_connected_scope
+        if last_scope:
+            model = last_scope.get('model_num', 'Unknown')
+            addr = last_scope.get('addr', 'Unknown')
+            serial = last_scope.get('serial_num', '')
+            if serial:
+                info_text = f"{model} (SN: {serial}) @ {addr}"
+            else:
+                info_text = f"{model} @ {addr}"
+            self.device_info.config(text=info_text)
+        else:
+            self.device_info.config(text="No device detected")
+
+    def _update_instrument_dropdown(self):
+        """Update the instrument dropdown with discovered instruments"""
+        # Build list of display strings and store mapping to addresses
+        self._instrument_map = {}  # Maps display string to instrument info
+        display_values = []
+
+        for instr in self.scope.instrument_list:
+            model = instr.get('model_num', 'Unknown')
+            addr = instr.get('addr', 'Unknown')
+            display_str = f"{model} @ {addr}"
+            display_values.append(display_str)
+            self._instrument_map[display_str] = instr
+
+        self.instrument_dropdown['values'] = display_values
+        if display_values:
+            self.instrument_dropdown.set('')  # Clear selection
+
+    def _on_instrument_selected(self, event=None):
+        """Handle instrument selection from dropdown"""
+        selected = self.instrument_var.get()
+        if not selected or selected not in self._instrument_map:
+            return
+
+        instr = self._instrument_map[selected]
+        addr = instr.get('addr')
+
+        # Get the appropriate driver for this instrument
+        driver = self.scope._get_driver_for_instrument(instr)
+        if driver is None:
+            messagebox.showwarning("Unsupported", f"No driver available for this instrument.")
+            return
+
+        # Connect to the selected scope
+        result = self.scope.setup_scope(addr, driver)
+        if result:
+            self.connection_status.config(text="Status: Connected")
+            device_info = self.scope.get_device_info()
+            self.device_info.config(text=f"{device_info}")
+        else:
+            self.connection_status.config(text="Status: Connection failed")
+            messagebox.showerror("Error", f"Failed to connect to scope at {addr}")
+
     def scan_for_scope(self):
         """Scan for connected oscilloscope"""
         try:
-            
             for _ in range(5):
                 # First scan for all available instruments
                 self.scope.scan_for_instruments()
-                
+
                 # Attempt to auto-connect to a supported scope
                 result = self.scope.auto_setup_scope()
                 if self.scope.scope is not None:
                     break
                 time.sleep(0.5)
-            
+
+            # Update the instrument dropdown with discovered instruments
+            self._update_instrument_dropdown()
+
             if result:
                 self.connection_status.config(text="Status: Connected")
                 device_info = self.scope.get_device_info()
-                self.device_info.config(text=f"Device: {device_info}")
+                self.device_info.config(text=f"{device_info}")
             else:
                 self.connection_status.config(text="Status: No supported scope found")
                 self.device_info.config(text="No device detected")

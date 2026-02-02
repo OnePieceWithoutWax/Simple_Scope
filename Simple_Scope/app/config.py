@@ -35,7 +35,9 @@ class AppConfig:
     last_used_metadata: dict = field(default_factory=dict)
     recent_directories: list = field(default_factory=list)
     display_captured_image: str = "Disabled"  # "Disabled", "Display To The Right", "Display Below"
+    display_image_size: str = "Medium"  # "Small" (500), "Medium" (750), "Large" (1024)
     auto_copy_to_clipboard: bool = False
+    last_connected_scope: dict = field(default_factory=dict)
 
     # Non-persisted fields (excluded from JSON)
     _config_file: Path = field(default=None, repr=False, compare=False)

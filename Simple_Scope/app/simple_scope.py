@@ -61,28 +61,70 @@ class SimpleScope:
         return self.instrument_list
         
     def auto_setup_scope(self):
-        """Setup scope based on the instrument list"""
-        self.logger.debug("Auto-detecting compatible scope...")
-        for instr in self.instrument_list:
-            manufacturer = instr.get("manufacturer", "")
-            model_num = instr.get("model_num", "")
+        """Setup scope based on the instrument list.
 
-            # Check for supported scope models
-            if manufacturer and model_num:
-                if "TEKTRONIX" in manufacturer and "MSO5" in model_num:
-                    self.logger.info(f"Found compatible Tektronix scope: {model_num}")
-                    from app.scope_controller import TektronixScopeDriver
-                    self.device_id = instr
-                    return self.setup_scope(instr["addr"], TektronixScopeDriver)
-                elif "LECROY" in manufacturer.upper() and "WAVESURFER" in model_num.upper():
-                    self.logger.debug(f"Found Lecroy scope (not yet supported): {model_num}")
-                    # Placeholder for Lecroy scope support
-                    # from app.scope_controller import LecroyScopeDriver
-                    # return self.setup_scope(instr["addr"], LecroyScopeDriver)
-                    return None
+        First checks if the last connected scope (from config) is available,
+        matching by serial number or address. Falls back to detecting any
+        compatible scope if not found.
+        """
+        self.logger.debug("Auto-detecting compatible scope...")
+
+        # First, try to reconnect to the last connected scope
+        last_scope = self.config.last_connected_scope
+        if last_scope:
+            last_serial = last_scope.get("serial_num")
+            last_addr = last_scope.get("addr")
+            self.logger.debug(f"Looking for last connected scope: {last_scope.get('model_num', 'Unknown')} (SN: {last_serial}, addr: {last_addr})")
+
+            for instr in self.instrument_list:
+                # Match by serial number (preferred) or address
+                serial_match = last_serial and instr.get("serial_num") == last_serial
+                addr_match = last_addr and instr.get("addr") == last_addr
+
+                if serial_match or addr_match:
+                    self.logger.info(f"Found last connected scope: {instr.get('model_num', 'Unknown')}")
+                    driver = self._get_driver_for_instrument(instr)
+                    if driver:
+                        self.device_id = instr
+                        return self.setup_scope(instr["addr"], driver)
+
+        # Fall back to detecting any compatible scope
+        for instr in self.instrument_list:
+            driver = self._get_driver_for_instrument(instr)
+            if driver:
+                self.logger.info(f"Found compatible scope: {instr.get('model_num', 'Unknown')}")
+                self.device_id = instr
+                return self.setup_scope(instr["addr"], driver)
 
         self.logger.warning("No compatible scope found in instrument list")
-        return None  # No compatible scope found
+        return None
+
+    def _get_driver_for_instrument(self, instr):
+        """Get the appropriate driver for an instrument.
+
+        Args:
+            instr (dict): Instrument info dictionary
+
+        Returns:
+            Driver class or None if not supported
+        """
+        manufacturer = instr.get("manufacturer", "")
+        model_num = instr.get("model_num", "")
+
+        if not manufacturer or not model_num:
+            return None
+
+        if "TEKTRONIX" in manufacturer and "MSO5" in model_num:
+            from app.scope_controller import TektronixScopeDriver
+            return TektronixScopeDriver
+        elif "LECROY" in manufacturer.upper() and "WAVESURFER" in model_num.upper():
+            self.logger.debug(f"Found Lecroy scope (not yet supported): {model_num}")
+            # Placeholder for Lecroy scope support
+            # from app.scope_controller import LecroyScopeDriver
+            # return LecroyScopeDriver
+            return None
+
+        return None
 
 
     def setup_scope(self, address, driver=None):
@@ -121,6 +163,9 @@ class SimpleScope:
                         serial = instr.get("serial_num", "")
                         if model and serial:
                             self.device_id = f"{model} (SN: {serial})"
+                        # Save scope info to config
+                        self.config.last_connected_scope = instr.copy()
+                        self.logger.debug(f"Saved last connected scope to config: {instr.get('model_num', 'Unknown')}")
                         break
                 self.logger.debug(f"Device ID: {self.device_id}")
             else:
