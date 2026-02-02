@@ -11,6 +11,9 @@ from typing import Any
 
 from app.version import __version__
 
+# Use SimpleScope namespace to integrate with app's logging hierarchy
+logger = logging.getLogger("SimpleScope.config")
+
 
 def _default_save_directory() -> str:
     return str(Path.home() / "Pictures" / "scope_capture")
@@ -31,6 +34,8 @@ class AppConfig:
     datestamp: bool = True
     last_used_metadata: dict = field(default_factory=dict)
     recent_directories: list = field(default_factory=list)
+    display_captured_image: str = "Disabled"  # "Disabled", "Display To The Right", "Display Below"
+    auto_copy_to_clipboard: bool = False
 
     # Non-persisted fields (excluded from JSON)
     _config_file: Path = field(default=None, repr=False, compare=False)
@@ -40,7 +45,7 @@ class AppConfig:
 
     def __post_init__(self):
         """Initialize paths and load existing config"""
-        object.__setattr__(self, '_app_data_dir', Path.home() / ".scope_capture")
+        object.__setattr__(self, '_app_data_dir', Path.home() / ".simple_scope")
 
         if self._config_file is None:
             object.__setattr__(self, '_config_file', self._app_data_dir / "config.json")
@@ -69,14 +74,13 @@ class AppConfig:
             self.save_config()
 
     def _log(self, level: str, message: str) -> None:
-        """Log a message if logger is available.
+        """Log a message using the module logger.
 
         Args:
             level: Log level ('debug', 'info', 'warning', 'error')
             message: Message to log
         """
-        if self._logger:
-            getattr(self._logger, level)(message)
+        getattr(logger, level)(message)
 
     @property
     def formatted_file_format(self) -> str:
@@ -93,14 +97,18 @@ class AppConfig:
         """Load configuration from file"""
         try:
             if self._config_file.exists():
+                logger.debug(f"Loading config from: {self._config_file}")
                 with open(self._config_file, 'r') as f:
                     loaded_config = json.load(f)
                     # Update fields with loaded values
                     for key, value in loaded_config.items():
                         if hasattr(self, key) and not key.startswith('_'):
                             object.__setattr__(self, key, value)
+                logger.debug(f"Config loaded successfully, {len(loaded_config)} keys")
+            else:
+                logger.debug(f"No existing config file at: {self._config_file}")
         except Exception as e:
-            self._log("error", f"Error loading configuration: {str(e)}")
+            logger.error(f"Error loading configuration: {str(e)}")
 
     def save_config(self) -> None:
         """Save configuration to file"""
@@ -120,8 +128,10 @@ class AppConfig:
             with open(self._config_file, 'w') as f:
                 json.dump(config_dict, f, indent=4)
 
+            logger.debug(f"Config saved to: {self._config_file}")
+
         except Exception as e:
-            self._log("error", f"Error saving configuration: {str(e)}")
+            logger.error(f"Error saving configuration: {str(e)}")
 
     # Methods with side effects (kept as methods)
 
