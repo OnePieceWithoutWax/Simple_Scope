@@ -6,8 +6,30 @@ from pathlib import Path
 import re
 import platform
 import subprocess
+import sys
 import os  # Kept for environment variables
 import datetime
+
+
+def get_resource_path(relative_path: str) -> Path:
+    """
+    Get the absolute path to a resource file.
+    Works both in development and when bundled with PyInstaller.
+
+    Args:
+        relative_path (str): Path relative to the resources directory
+
+    Returns:
+        Path: Absolute path to the resource file
+    """
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Running in development
+        base_path = Path(__file__).parent.parent
+
+    return base_path / "resources" / relative_path
 
 def expand_environment_vars(path):
     """

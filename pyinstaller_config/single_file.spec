@@ -17,6 +17,7 @@ version_info = str(version_info_file) if version_info_file.exists() else None
 data_files = [
     (str(base_path / 'Simple_Scope' / 'app'), 'app'),
     (str(base_path / 'Simple_Scope' / 'tests'), 'tests'),
+    (str(base_path / 'Simple_Scope' / 'resources'), 'resources'),
 ]
 
 # Add any additional files or directories that need to be included

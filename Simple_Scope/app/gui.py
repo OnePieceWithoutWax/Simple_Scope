@@ -5,8 +5,10 @@ import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from tkinter.scrolledtext import ScrolledText
 import webbrowser
 from app.simple_scope import SimpleScope
+from app.utils import get_resource_path
 
 class ScopeCaptureGUI(tk.Tk):
     """Main application window for the oscilloscope capture tool"""
@@ -859,13 +861,23 @@ class ScopeCaptureGUI(tk.Tk):
             messagebox.showerror("Error", f"Failed to capture screenshot: {str(e)}")
 
     def _initialize_help_tab(self):
-        """Initialize the Help tab with toggleable log display"""
+        """Initialize the Help tab with help documentation and toggleable log display"""
         frame = ttk.Frame(self.help_tab, padding=(20, 10))
         frame.pack(fill='both', expand=True)
 
-        # Help text at top
-        help_text = "For bug reports or feature requests, please check the About tab for contact information."
-        ttk.Label(frame, text=help_text, wraplength=500).pack(anchor='w', pady=(0, 10))
+        # Help documentation section
+        help_label_frame = ttk.LabelFrame(frame, text="Help Documentation")
+        help_label_frame.pack(fill='both', expand=True, pady=(0, 10))
+
+        # Load and display help content
+        self.help_text_widget = ScrolledText(help_label_frame, wrap='word', font=('TkDefaultFont', 9),
+                                              height=15, state='normal')
+        self.help_text_widget.pack(fill='both', expand=True, padx=5, pady=5)
+        self._load_help_content()
+        self.help_text_widget.config(state='disabled')  # Make read-only
+
+        # Separator
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
 
         # Controls row: Save Log button and Show Application Log checkbox
         controls_frame = ttk.Frame(frame)
@@ -904,6 +916,20 @@ class ScopeCaptureGUI(tk.Tk):
 
         # Load existing log entries
         self._refresh_log_display()
+
+    def _load_help_content(self):
+        """Load help documentation from markdown file"""
+        try:
+            help_file_path = get_resource_path("Simple_Scope_Help.md")
+            if help_file_path.exists():
+                with open(help_file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self.help_text_widget.insert('1.0', content)
+            else:
+                self.help_text_widget.insert('1.0', "Help documentation not found.\n\n"
+                                             "For bug reports or feature requests, please check the About tab.")
+        except Exception as e:
+            self.help_text_widget.insert('1.0', f"Error loading help documentation: {e}")
 
     def _toggle_log_display(self):
         """Toggle the visibility of the application log"""
