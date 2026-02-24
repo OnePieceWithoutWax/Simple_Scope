@@ -21,6 +21,14 @@ call %conda_folder%\Scripts\activate.bat %conda_folder%
 REM call conda activate simplescope
 call %conda_folder%\condabin\conda.bat activate simplescope
 
+echo running pre-build script (Version info, etc)...
+python "%~dp0build.py"
+if errorlevel 1 (
+  echo build.py failed, aborting.
+  pause
+  exit /b 1
+)
+
 echo Building Simple_Scope packages...
 
 echo Building single-file executable...

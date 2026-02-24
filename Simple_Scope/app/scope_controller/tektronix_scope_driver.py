@@ -6,8 +6,9 @@ Controller for communicating with the oscilloscope via pyvisa
 # import pathlib
 from pathlib import Path
 from .base_scope_driver import ScopeDriver
+from .base_scpi import SCPIMixin
 
-class TektronixScopeDriver(ScopeDriver):
+class TektronixScopeDriver(ScopeDriver, SCPIMixin):
     """Controller class for Tektronix MSO5x oscilloscope"""
     
 
@@ -59,21 +60,32 @@ class TektronixScopeDriver(ScopeDriver):
 
     def capture_screenshot(self, *args, **kwargs): #, save_dir=None, filename=None, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
         ''' Returns an image of the scope screen, does not save it to disk. use save_screenshot() for that'''
+        self._log("debug", "capture_screenshot called")
         return self.get_screenshot_brian()
 
     def get_screenshot_brian(self):
-        ''' This method works when and AI cant figure it out'''
-        #Screen Capture on Tektronix Windows Scope
-        self.adaptor.write('SAVE:IMAGe \"C:/Temp.png\"') # Take a scope shot
-        self.adaptor.query('*OPC?') # Wait for instrument to finish writing image to disk
-        
-        self.adaptor.write('FILESystem:READFile "C:/Temp.png"') # Read temp image file from instrument
-        
-        img_data = self.adaptor.read_raw(1024*1024) # return that read...
-        
-        self.adaptor.write('FILESystem:DELEte "C:/Temp.png"') # Remove the Temp.png file
-        
-        return img_data
+        ''' This method works when and AI cant figure it out
+        does not work always...not sure why yet
+        '''
+        self._log("debug", "get_screenshot_brian: starting capture sequence")
+        try:
+            #Screen Capture on Tektronix Windows Scope
+            self.adaptor.write('SAVE:IMAGe \"C:/temp_scopeshot/temp.png\"') # Take a scope shot
+            self.adaptor.query('*OPC?') # Wait for instrument to finish writing image to disk
+
+            self.adaptor.write('FILESystem:READFile "C:/temp_scopeshot/temp.png"') # Read temp image file from instrument
+
+            img_data = self.adaptor.read_raw(1024*1024) # return that read...
+
+            self.adaptor.write('FILESystem:DELEte "C:/temp_scopeshot/temp.png"') # Remove the Temp.png file
+
+            self._log("debug", f"get_screenshot_brian: capture complete, {len(img_data)} bytes read")
+            return img_data
+        except Exception as e:
+            code, message = self.next_error
+            self._log("error", f"get_screenshot_brian: instrument error [{code}]: {message}")
+            self._log("error", f"get_screenshot_brian: {e}")
+            raise
 
 
     def _save_waveform_data(self, file_path):
