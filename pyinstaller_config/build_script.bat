@@ -22,9 +22,9 @@ REM call conda activate simplescope
 call %conda_folder%\condabin\conda.bat activate simplescope
 
 echo running pre-build script (Version info, etc)...
-python "%~dp0build.py"
+python "%~dp0pre_build.py"
 if errorlevel 1 (
-  echo build.py failed, aborting.
+  echo pre_build.py failed, aborting.
   pause
   exit /b 1
 )
@@ -36,6 +36,9 @@ call pyinstaller single_file.spec
 
 echo Building directory structure...
 call pyinstaller directory.spec
+
+echo Running post-build cleanup...
+python "%~dp0post_build.py"
 
 echo Done! Built packages are in the 'dist' folder.
 pause
