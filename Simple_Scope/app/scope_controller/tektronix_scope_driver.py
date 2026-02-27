@@ -10,7 +10,56 @@ from .base_scpi import SCPIMixin
 
 class TektronixScopeDriver(ScopeDriver, SCPIMixin):
     """Controller class for Tektronix MSO5x oscilloscope"""
-    
+
+    _scope_temp_dir: str = "C:/temp"
+
+    def __init__(self, address=None, name=None, logger=None):
+        super().__init__(address=address, name=name, logger=logger)
+        # Tektronix-specific init goes here
+
+        self.setup_screenshot_dir()
+
+
+    def setup_screenshot_dir(self) -> None:
+        """Create temp directory and clear any existing files."""
+        # Create directory on scope (will not error if it already exists)
+        try:
+            self.adaptor.write(f'FILESystem:MKDir "{self._scope_temp_dir}"')
+            self._log('info', f"Scope temp directory ready: {self._scope_temp_dir}")
+        except Exception as e:
+            self._log('error', f"Note: {e} (directory may already exist)")
+        # Clear all files in the temp directory
+        self.clear_temp_directory()
+
+
+    def clear_temp_directory(self) -> None:
+        """
+        Delete all files in the scope's temp directory.
+        
+        Args:
+            scope: PyVISA instrument object
+            self._scope_temp_dir: Path to temp directory on scope filesystem
+        """
+        try:
+            # Get directory listing
+            self.adaptor.write(f'FILESystem:CWD "{self._scope_temp_dir}"')
+            dir_contents = self.adaptor.query('FILESystem:DIR?').strip()
+            
+            if dir_contents and dir_contents != '""':
+                # Parse the directory listing (format may vary by scope model)
+                # Typically returns comma-separated list of files
+                files = [f.strip('"') for f in dir_contents.split(',') if f.strip()]
+                
+                for filename in files:
+                    if filename and filename not in ['.', '..']:
+                        file_path = f"{self._scope_temp_dir}/{filename}"
+                        self.adaptor.write(f'FILESystem:DELEte "{file_path}"')
+                        self._log('info', f"Deleted from scope: {file_path}")
+            else:
+                self._log('info', f"Scope temp directory is empty: {self._scope_temp_dir}")
+
+        except Exception as e:
+            self._log('error', f"Error clearing scope temp directory: {e}")
 
 
     def save_screenshot(self, save_dir, filename, suffix='.png', bg_color="white", save_waveform=False, metadata=None):
@@ -70,15 +119,18 @@ class TektronixScopeDriver(ScopeDriver, SCPIMixin):
         self._log("debug", "get_screenshot_brian: starting capture sequence")
         try:
             #Screen Capture on Tektronix Windows Scope
-            self.adaptor.write('SAVE:IMAGe \"C:/temp_scopeshot/temp.png\"') # Take a scope shot
+            self.adaptor.write(f'SAVE:IMAGe \"{self._scope_temp_dir}/temp.png\"') # Take a scope shot
+            self._log("debug", f"wrote to save image at {self._scope_temp_dir}/temp.png on scope")
             self.adaptor.query('*OPC?') # Wait for instrument to finish writing image to disk
+            self._log("debug", "OPC done")
 
-            self.adaptor.write('FILESystem:READFile "C:/temp_scopeshot/temp.png"') # Read temp image file from instrument
+            self.adaptor.write(f'FILESystem:READFile "{self._scope_temp_dir}/temp.png"') # Read temp image file from instrument
 
             img_data = self.adaptor.read_raw(1024*1024) # return that read...
+            self._log("debug", "reading the image back to computer")
 
-            self.adaptor.write('FILESystem:DELEte "C:/temp_scopeshot/temp.png"') # Remove the Temp.png file
-
+            self.adaptor.write(f'FILESystem:DELEte "{self._scope_temp_dir}/temp.png"') # Remove the Temp.png file
+            self._log("debug", "Cleaning up temp file")
             self._log("debug", f"get_screenshot_brian: capture complete, {len(img_data)} bytes read")
             return img_data
         except Exception as e:
