@@ -866,11 +866,11 @@ class ScopeCaptureGUI(tk.Tk):
         frame.pack(fill='both', expand=True)
 
         # Help documentation section
-        help_label_frame = ttk.LabelFrame(frame, text="Help Documentation")
-        help_label_frame.pack(fill='both', expand=True, pady=(0, 10))
+        self.help_label_frame = ttk.LabelFrame(frame, text="Help Documentation")
+        self.help_label_frame.pack(fill='both', expand=True, pady=(0, 10))
 
         # Load and display help content
-        self.help_text_widget = ScrolledText(help_label_frame, wrap='word', font=('TkDefaultFont', 9),
+        self.help_text_widget = ScrolledText(self.help_label_frame, wrap='word', font=('TkDefaultFont', 9),
                                               height=15, state='normal')
         self.help_text_widget.pack(fill='both', expand=True, padx=5, pady=5)
         self._load_help_content()
@@ -934,9 +934,11 @@ class ScopeCaptureGUI(tk.Tk):
     def _toggle_log_display(self):
         """Toggle the visibility of the application log"""
         if self.show_log_var.get():
+            self.help_label_frame.pack_forget()
             self.log_container.pack(fill='both', expand=True)
         else:
             self.log_container.pack_forget()
+            self.help_label_frame.pack(fill='both', expand=True, pady=(0, 10))
 
     def _on_log_entry(self, record):
         """Callback when a new log record is added."""

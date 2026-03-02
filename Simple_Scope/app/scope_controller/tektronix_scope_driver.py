@@ -16,7 +16,6 @@ class TektronixScopeDriver(ScopeDriver, SCPIMixin):
     def __init__(self, address=None, name=None, logger=None):
         super().__init__(address=address, name=name, logger=logger)
         # Tektronix-specific init goes here
-
         self.setup_screenshot_dir()
 
 
